@@ -1,0 +1,58 @@
+# Phase 4a — reproduction runs on the free Colab T4 (Track 1 / Table 1). Resumable: rerun the same
+# command in later sessions until `--dry-run` shows nothing pending.
+#
+#   cd /content/project
+#   python scripts/run_queue.py configs/jobs/phase4_reproduction.yaml \
+#       --out-root /content/drive/MyDrive/CS787/outputs --budget-min 100 --var SID_ROOT=/content/efficient-SID-code
+#   (add --only <job name> to run one job)
+#
+# Images: the 15 sinddm15 images (data/manifests/uncond_sinddm15.csv; fetch with
+#         `python scripts/prepare_natural.py --verify --sets uncond/sinddm15`).
+# Seeds 10..59 = the official script's `seed: 10, num_samples: 50` (sample i uses seed 10 + i).
+# Precision: fp32 throughout (the T4 has no native bf16; notes D2/D3).
+#
+# Order matters: the runner works through jobs top to bottom, so the main Table-1 row comes first.
+# Rough cost [estimate, recalibrate with notebook 00]: ~10-20 s/sample at ~250 px on a T4
+#   -> official_paper_fp32 750 samples ~2-4 T4-h; each 20-seed variant ~1-1.5 T4-h.
+
+experiment: phase4_reproduction
+
+defaults:
+  images_manifest: data/manifests/uncond_sinddm15.csv
+
+jobs:
+  # Table 1, "proposed (T=10, eta=0)": the main reproduction target (R1).
+  - name: official_paper_fp32
+    method: sid_official
+    seeds: {start: 10, count: 50}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.query_chunks=2]
+
+  # Our re-implementation on the same seeds: a GPU-side equivalence check on all 15 images
+  # (the CPU check is reports/equivalence/). 5 seeds are enough.
+  - name: core_paper_fp32
+    method: sid_core
+    seeds: {start: 10, count: 5}
+    params: {backend: chunked, query_chunks: 2}
+
+  # Table 1, "proposed (T=40, eta=1)" (R2): better SIFID, less diversity.
+  - name: official_T40_eta1_fp32
+    method: sid_official
+    seeds: {start: 10, count: 20}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.query_chunks=2, scheduler.num_steps=40, scheduler.eta=1.0]
+
+  # Table 1, "proposed (ANN, k=5)" (R2): faster, slightly worse SIFID. Needs faiss on the GPU
+  # (notebook 00 reports whether it imports); if it does not, this job's errors.jsonl says so and
+  # the other jobs are unaffected.
+  - name: official_ann_k5_fp32
+    method: sid_official
+    seeds: {start: 10, count: 20}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.type=ann, image_denoiser.patch_denoiser.k=5]

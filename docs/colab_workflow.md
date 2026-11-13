@@ -12,13 +12,14 @@ This page is the how-to; the reasons behind it are in PROJECT_PLAN.md §5–§6.
 2. **Google Drive layout** (created automatically): `MyDrive/CS787/{outputs, checkpoints, tables, env_logs, data}`.
 3. **Optional:** a free Hugging Face account, with the FLUX.1-schnell terms accepted. This is only needed for the latent-space ablation AB5.
 
-## 2. Phase-2 notebooks (run once each, in this order)
+## 2. Notebooks (Phase 2: run 00, 05, 06 once each; then 10 for the experiments)
 
 | Notebook | GPU time [est.] | What it settles |
 |---|---|---|
 | `notebooks/00_setup_smoke.ipynb` | 20–30 min | Official code runs on a T4; D2/D3 precision questions; **T4 timing table** → `tables/phase2_t4_timing.csv`; faiss import |
 | `notebooks/05_sinddm_port.ipynb` | 25–35 min | Ported SinDDM samples the 3 pretrained models; **seconds per 1 000 training steps** → `tables/phase2_sinddm_timing.json`; stop-and-resume works |
 | `notebooks/06_lora_smoke.ipynb` | 15–20 min | SD 1.5 LoRA fits on a T4; train and sample timings → `tables/phase2_lora_timing.json` |
+| `notebooks/10_run_queue.ipynb` *(Phase 4+, rerun every session)* | ~100 min per session | Runs a job file through the resumable runner (default: `configs/jobs/phase4_reproduction.yaml`, the Table-1 reproduction). Fetches the sinddm15 images and checks them against the committed manifest first |
 | `notebooks/07_tpu_sinddm.ipynb` *(optional, **TPU runtime**)* | 30–45 min | Is the free **v5e-1 TPU** ≥ 2× faster than the T4 at SinDDM training? → `tables/phase2_sinddm_timing_tpu.json` + a printed decision. **Run after 05.** |
 
 ### About the free TPU

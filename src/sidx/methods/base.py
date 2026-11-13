@@ -46,6 +46,7 @@ class Method(ABC):
 METHOD_REGISTRY: Dict[str, str] = {
     "dummy_shuffle": "sidx.methods.dummy:DummyShuffle",
     "sid_official": "sidx.methods.sid_official:SidOfficial",
+    "sid_core": "sidx.methods.sid_core:SidCore",
 }
 
 

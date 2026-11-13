@@ -12,3 +12,9 @@ external/SinDDM/
 # generated outputs (the real ones live on Google Drive)
 outputs*/
 *.tmp
+
+# third-party images (non-commercial / undocumented rights): fetched by scripts/prepare_natural.py,
+# verified against the committed manifests' sha256 column
+data/natural/
+# equivalence-check sample images (the JSON reports are committed)
+reports/equivalence/*/

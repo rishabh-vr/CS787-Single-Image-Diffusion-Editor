@@ -497,6 +497,58 @@ assert devs == {"cpu"}
     ]
 
 
+def nb_queue():
+    return [
+        md('''
+# 10 · Run an experiment queue (Phase 4 onwards)
+
+**Runtime → Change runtime type → T4 GPU**, then *Run all*. Rerun this notebook in later sessions:
+finished samples are on Google Drive and are skipped, so every session continues where the last
+one stopped.
+
+Default queue: `configs/jobs/phase4_reproduction.yaml`
+1. Table 1 main row: official code, 15 images × 50 seeds.
+2. Our re-implementation on 5 seeds (a GPU-side equivalence check).
+3. The T = 40, η = 1 variant (20 seeds).
+4. The ANN k = 5 variant (20 seeds).
+
+Each session stops cleanly before `BUDGET_MIN` minutes. Close the runtime afterwards
+(**Runtime → Disconnect and delete runtime**).
+'''),
+        code(SETTINGS + '''
+NOTEBOOK   = "10_run_queue"
+JOB_FILE   = "configs/jobs/phase4_reproduction.yaml"
+BUDGET_MIN = 100      # this session's GPU minutes; the queue stops before exceeding it
+ONLY       = ""       # optional: run just one job by name, e.g. "official_paper_fp32"
+'''),
+        code(GPU_CHECK),
+        code(MOUNT_AND_CODE),
+        code(INSTALL_SID),
+        md("## Data: fetch the images and verify them against the committed manifests (sha256)"),
+        code('''
+r = subprocess.run([sys.executable, "scripts/prepare_natural.py", "--verify", "--sets", "uncond/sinddm15",
+                    "--sid-root", SID_ROOT], cwd=PROJECT, capture_output=True, text=True)
+print(r.stdout[-2000:], r.stderr[-2000:])
+assert r.returncode == 0, "data check failed (see above)"
+'''),
+        md("## What is still pending"),
+        code('''
+OUT_ROOT = f"{DRIVE_ROOT}/outputs"
+base = [sys.executable, "scripts/run_queue.py", JOB_FILE, "--out-root", OUT_ROOT, "--var", f"SID_ROOT={SID_ROOT}"]
+if ONLY:
+    base += ["--only", ONLY]
+print(subprocess.run(base + ["--dry-run"], cwd=PROJECT, capture_output=True, text=True).stdout)
+'''),
+        md("## Run (stops cleanly before the budget; output streams below)"),
+        code('''
+ret = subprocess.run(base + ["--budget-min", str(BUDGET_MIN)], cwd=PROJECT).returncode
+print("runner exit code", ret)
+print(subprocess.run(base + ["--dry-run"], cwd=PROJECT, capture_output=True, text=True).stdout)
+'''),
+        code(FREEZE),
+    ]
+
+
 def main() -> None:
     # Optional filter: `python scripts/make_notebooks.py 07` regenerates only matching notebooks,
     # so notebooks saved from Colab with outputs (e.g. 05) are not overwritten.
@@ -508,7 +560,8 @@ def main() -> None:
     for fname, cells in (("00_setup_smoke.ipynb", nb_setup_smoke()),
                          ("05_sinddm_port.ipynb", nb_sinddm()),
                          ("06_lora_smoke.ipynb", nb_lora()),
-                         ("07_tpu_sinddm.ipynb", nb_tpu())):
+                         ("07_tpu_sinddm.ipynb", nb_tpu()),
+                         ("10_run_queue.ipynb", nb_queue())):
         if only and not any(fname.startswith(p) for p in only):
             continue
         nb_meta = dict(meta)
