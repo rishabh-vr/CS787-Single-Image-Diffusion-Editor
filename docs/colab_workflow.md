@@ -23,6 +23,8 @@ This page is the how-to; the reasons behind it are in PROJECT_PLAN.md §5–§6.
 | `notebooks/07_tpu_sinddm.ipynb` *(optional, **TPU runtime**)* | 30–45 min | Is the free **v5e-1 TPU** ≥ 2× faster than the T4 at SinDDM training? → `tables/phase2_sinddm_timing_tpu.json` + a printed decision. **Run after 05.** |
 
 ### About the free TPU
+**Result (2026-11-13): on the v5e-1, SinDDM trained 0.55–0.79× as fast as on the T4, so the TPU is not used.** Notebook 07 is kept for reference.
+
 - The free Colab TPU is a **v5e-1** (one chip, 16 GB). The older v2-8 was retired in 2025.
 - Like the T4, its availability is not guaranteed.
 - Only **SinDDM training** is worth trying on it, because that's the project's only real compute bottleneck. Notebook 07 measures it with exactly the same method as notebook 05:
