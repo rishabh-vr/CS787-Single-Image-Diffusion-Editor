@@ -19,6 +19,21 @@ This page is the how-to; the reasons behind it are in PROJECT_PLAN.md §5–§6.
 | `notebooks/00_setup_smoke.ipynb` | 20–30 min | Official code runs on a T4; D2/D3 precision questions; **T4 timing table** → `tables/phase2_t4_timing.csv`; faiss import |
 | `notebooks/05_sinddm_port.ipynb` | 25–35 min | Ported SinDDM samples the 3 pretrained models; **seconds per 1 000 training steps** → `tables/phase2_sinddm_timing.json`; stop-and-resume works |
 | `notebooks/06_lora_smoke.ipynb` | 15–20 min | SD 1.5 LoRA fits on a T4; train and sample timings → `tables/phase2_lora_timing.json` |
+| `notebooks/07_tpu_sinddm.ipynb` *(optional, **TPU runtime**)* | 30–45 min | Is the free **v5e-1 TPU** ≥ 2× faster than the T4 at SinDDM training? → `tables/phase2_sinddm_timing_tpu.json` + a printed decision. **Run after 05.** |
+
+### About the free TPU
+- The free Colab TPU is a **v5e-1** (one chip, 16 GB). The older v2-8 was retired in 2025.
+- Like the T4, its availability is not guaranteed.
+- Only **SinDDM training** is worth trying on it, because that's the project's only real compute bottleneck. Notebook 07 measures it with exactly the same method as notebook 05:
+  - steady-state seconds per 1 000 steps;
+  - the cost of compiling the XLA graph is cancelled out.
+- Our SinDDM port runs on the TPU with `--device xla`:
+  - no device-to-host syncs inside the loop;
+  - one XLA graph per step;
+  - checkpoints saved as CPU tensors, so a TPU-trained model samples on the T4.
+- **Kept off the TPU:**
+  - the paper's method — nothing to train, and the code is CUDA-only;
+  - LoRA — short already, and diffusers' LoRA script targets CUDA.
 
 In Colab: **File → Open notebook → GitHub tab** (or upload the file), then **Runtime → Change runtime type → T4 GPU**, then **Run all**.
 

@@ -12,18 +12,39 @@ index d924ff3..a682e10 100644
      mask = mask[:, :, None, None]
      mask = mask.transpose(3, 2, 0, 1)
 diff --git a/SinDDM/trainer.py b/SinDDM/trainer.py
-index 0a6b2ee..9533089 100644
+index 0a6b2ee..d63e98d 100644
 --- a/SinDDM/trainer.py
 +++ b/SinDDM/trainer.py
-@@ -164,10 +164,15 @@ class MultiscaleTrainer(object):
+@@ -30,6 +30,17 @@ except:
+     APEX_AVAILABLE = False
+ 
+ 
++def _to_cpu(obj):
++    """[port] Recursively move tensors to CPU (checkpoints must not hold XLA/CUDA tensors)."""
++    if torch.is_tensor(obj):
++        return obj.detach().cpu()
++    if isinstance(obj, dict):
++        return type(obj)((k, _to_cpu(v)) for k, v in obj.items())
++    if isinstance(obj, (list, tuple)):
++        return type(obj)(_to_cpu(v) for v in obj)
++    return obj
++
++
+ # dataset classes
+ 
+ class Dataset(data.Dataset):
+@@ -164,10 +175,17 @@ class MultiscaleTrainer(object):
              'model': self.model.state_dict(),
              'ema': self.ema_model.state_dict(),
              'sched': self.scheduler.state_dict(),
+-            'running_loss': self.running_loss,
 +            'opt': self.opt.state_dict(),  # [port] needed to resume training across Colab sessions
-             'running_loss': self.running_loss,
++            'running_loss': [float(v) for v in self.running_loss],
              'running_scale': self.running_scale
          }
 -        torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
++        # [port] checkpoints always hold CPU tensors, so one trained on a TPU (XLA) loads on a GPU/CPU
++        data = _to_cpu(data)
 +        # [port] write to a temp file then rename, so a disconnect mid-save never corrupts a checkpoint
 +        final_path = self.results_folder / f'model-{milestone}.pt'
 +        tmp_path = self.results_folder / f'model-{milestone}.pt.tmp'
@@ -32,7 +53,7 @@ index 0a6b2ee..9533089 100644
          plt.rcParams['figure.figsize'] = [16, 8]
  
          plt.plot(self.running_loss)
-@@ -177,21 +182,46 @@ class MultiscaleTrainer(object):
+@@ -177,33 +195,78 @@ class MultiscaleTrainer(object):
          plt.clf()
  
      def load(self, milestone):
@@ -42,7 +63,9 @@ index 0a6b2ee..9533089 100644
 +        # that one type, rather than falling back to full (code-executing) unpickling.
 +        import collections
 +        with torch.serialization.safe_globals([collections.Counter]):
-+            data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location=self.device,
++            # [port] load to CPU; load_state_dict copies onto the model's device (CUDA, CPU or XLA),
++            # and Optimizer.load_state_dict moves its state next to the parameters.
++            data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location='cpu',
 +                              weights_only=True)
  
          self.step = data['step']
@@ -55,19 +78,30 @@ index 0a6b2ee..9533089 100644
      #    self.running_scale = data['running_scale']
  
 -    def train(self):
-+    def train(self, time_budget_s=None, checkpoint_every_s=None):
++    def train(self, time_budget_s=None, checkpoint_every_s=None, sync_free=False, xla=False):
 +        """[port] Returns True when train_num_steps is reached, False when stopped by the time budget.
 +
 +        time_budget_s: stop cleanly (saving 'model-last.pt') once this many seconds have elapsed.
 +        checkpoint_every_s: also save 'model-last.pt' this often, so a disconnect loses little work.
++        sync_free: never read device values back to the host inside the loop. The scale index is drawn
++            on the host (same distribution as torch.multinomial over num_timesteps_trained, a different
++            random stream), and the loss is accumulated on-device and read only every avg_window steps.
++            Required for good speed on TPU (XLA); harmless elsewhere.
++        xla: running on a TPU through torch_xla — cut the lazy graph once per step (xm.mark_step).
 +        """
 +        import time as _time
++        import random as _random
 +        t_start = _time.time()
 +        t_last_ckpt = t_start
++        sync_free = sync_free or xla
++        if xla:
++            import torch_xla.core.xla_model as xm
  
          backwards = partial(loss_backwards, self.fp16)
          loss_avg = 0
          s_weights = torch.tensor(self.model.num_timesteps_trained, device=self.device, dtype=torch.float)
++        s_weights_host = [float(w) for w in self.model.num_timesteps_trained]
++        scales = list(range(len(s_weights_host)))
          while self.step < self.train_num_steps:
 +            now = _time.time()
 +            if time_budget_s is not None and now - t_start >= time_budget_s:
@@ -80,8 +114,40 @@ index 0a6b2ee..9533089 100644
 +                print(f'[port] periodic checkpoint at step {self.step}')
  
              # t weighted multinomial sampling
-             s = torch.multinomial(input=s_weights, num_samples=1)  # uniform when train_full_t = True
-@@ -221,7 +251,9 @@ class MultiscaleTrainer(object):
+-            s = torch.multinomial(input=s_weights, num_samples=1)  # uniform when train_full_t = True
++            if sync_free:  # [port] host-side draw: a plain int, so no device->host read per step
++                s = _random.choices(scales, weights=s_weights_host, k=1)[0]
++            else:
++                s = torch.multinomial(input=s_weights, num_samples=1)  # uniform when train_full_t = True
+             for i in range(self.gradient_accumulate_every):
+                 data = self.data_list[s]
+                 loss = self.model(data, s)
+-                loss_avg += loss.item()
++                if sync_free:
++                    loss_avg = loss_avg + loss.detach()  # stays on device
++                else:
++                    loss_avg += loss.item()
+                 backwards(loss / self.gradient_accumulate_every, self.opt)
+ 
+             if self.step % self.avg_window == 0:
+-                print(f'step:{self.step} loss:{loss_avg/self.avg_window}')
+-                self.running_loss.append(loss_avg/self.avg_window)
++                avg = float(loss_avg) / self.avg_window  # the only host read in sync_free mode
++                print(f'step:{self.step} loss:{avg}')
++                self.running_loss.append(avg)
+                 loss_avg = 0
+             self.opt.step()
+             self.opt.zero_grad()
+@@ -211,6 +274,8 @@ class MultiscaleTrainer(object):
+             if self.step % self.update_ema_every == 0:
+                 self.step_ema()
+             self.scheduler.step()
++            if xla:
++                xm.mark_step()  # [port] execute this step's graph on the TPU
+             self.step += 1
+             if self.step % self.save_and_sample_every == 0:
+                 milestone = self.step // self.save_and_sample_every
+@@ -221,7 +286,9 @@ class MultiscaleTrainer(object):
                  utils.save_image(all_images, str(self.results_folder / f'sample-{milestone}.png'), nrow=4)
                  self.save(milestone)
  
@@ -92,7 +158,7 @@ index 0a6b2ee..9533089 100644
      def sample_scales(self, scale_mul=None, batch_size=16, custom_sample=False, custom_image_size_idxs=None,
                        custom_scales=None, image_name='', start_noise= True, custom_t_list=None, desc=None, save_unbatched=True):
 diff --git a/main.py b/main.py
-index f6c9b6e..bb80103 100644
+index f6c9b6e..5848515 100644
 --- a/main.py
 +++ b/main.py
 @@ -6,7 +6,7 @@ import torchvision
@@ -104,7 +170,7 @@ index f6c9b6e..bb80103 100644
  
  def main():
  
-@@ -51,6 +51,15 @@ def main():
+@@ -51,6 +51,21 @@ def main():
      parser.add_argument("--sample_t_list", nargs="+", help='Custom list of timesteps corresponding to each scale (except scale 0).', type=int)
      # device num
      parser.add_argument("--device_num", help='use specific cuda device.', default=0, type=int)
@@ -117,22 +183,38 @@ index f6c9b6e..bb80103 100644
 +                        default=None, type=float)
 +    parser.add_argument("--checkpoint_every_min", help='[port] save model-last.pt this often while training.',
 +                        default=15.0, type=float)
++    parser.add_argument("--sync_free", help='[port] no per-step device->host reads (always on with --device xla).',
++                        action='store_true')
++    parser.add_argument("--xla_matmul_precision", help='[port] TPU matmul precision: default (bf16, fastest), '
++                        'high, or highest (~fp32).', default='default', choices=['default', 'high', 'highest'])
++    parser.add_argument("--skip_final_sample", help='[port] do not sample after training finishes.',
++                        action='store_true')
  
      # DEV. params - do not modify
      parser.add_argument("--sample_limited_t", help='limit t in each scale to stop at the start of the next scale', action='store_true')
-@@ -60,7 +69,20 @@ def main():
+@@ -60,7 +75,30 @@ def main():
      args = parser.parse_args()
  
      print('num devices: '+ str(torch.cuda.device_count()))
 -    device = f"cuda:{args.device_num}"
-+    # [port] allow CPU (local tests) and auto-detection
-+    if args.device == 'auto':
++    # [port] allow CPU (local tests), TPU (torch_xla) and auto-detection
++    use_xla = args.device == 'xla'
++    if use_xla:
++        import torch_xla
++        import torch_xla.core.xla_model as xm
++        device = xm.xla_device()
++        try:  # torch_xla >= 2.6
++            import torch_xla.backends
++            torch_xla.backends.set_mat_mul_precision(args.xla_matmul_precision)
++        except Exception as e:
++            print(f'[port] could not set XLA matmul precision ({e!r}); using the torch_xla default')
++    elif args.device == 'auto':
 +        device = f"cuda:{args.device_num}" if torch.cuda.is_available() else "cpu"
 +    elif args.device == 'cuda':
 +        device = f"cuda:{args.device_num}"
 +    else:
 +        device = args.device
-+    print(f'[port] device: {device}')
++    print(f'[port] device: {device}' + (f' (matmul precision: {args.xla_matmul_precision})' if use_xla else ''))
 +    if args.seed is not None:
 +        import random
 +        random.seed(args.seed)
@@ -142,7 +224,7 @@ index f6c9b6e..bb80103 100644
      scale_mul = (args.scale_mul[0], args.scale_mul[1])
      sched_milestones = [val * 1000 for val in args.sched_k_milestones]
      results_folder = args.results_folder + '/' + args.scope
-@@ -131,7 +153,19 @@ def main():
+@@ -131,7 +169,24 @@ def main():
      if args.load_milestone > 0:
          ScaleTrainer.load(milestone=args.load_milestone)
      if args.mode == 'train':
@@ -155,15 +237,20 @@ index f6c9b6e..bb80103 100644
 +        completed = ScaleTrainer.train(
 +            time_budget_s=None if args.time_budget_min is None else args.time_budget_min * 60,
 +            checkpoint_every_s=None if args.checkpoint_every_min is None else args.checkpoint_every_min * 60,
++            sync_free=args.sync_free,
++            xla=use_xla,
 +        )
++        if use_xla:
++            xm.wait_device_ops()  # [port] make wall-clock timings include all queued TPU work
 +        if not completed:
 +            print('[port] stopped by time budget; rerun with --resume to continue')
 +            return
-+        # Sample after training is complete
++        if args.skip_final_sample:
++            return
          # Sample after training is complete
          ScaleTrainer.sample_scales(scale_mul=(1, 1),    # H,W
                                     custom_sample=True,
-@@ -156,6 +190,7 @@ def main():
+@@ -156,6 +211,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}
@@ -171,7 +258,7 @@ index f6c9b6e..bb80103 100644
          t2l_clip_extractor = ClipExtractor(clip_cfg)
          clip_custom_t_list = sample_t_list
  
-@@ -192,6 +227,7 @@ def main():
+@@ -192,6 +248,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}
@@ -179,7 +266,7 @@ index f6c9b6e..bb80103 100644
          t2l_clip_extractor = ClipExtractor(clip_cfg)
          clip_custom_t_list = sample_t_list
  
-@@ -231,6 +267,7 @@ def main():
+@@ -231,6 +288,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}

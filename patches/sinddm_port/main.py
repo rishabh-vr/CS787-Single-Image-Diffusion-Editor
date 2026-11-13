@@ -60,6 +60,12 @@ def main():
                         default=None, type=float)
     parser.add_argument("--checkpoint_every_min", help='[port] save model-last.pt this often while training.',
                         default=15.0, type=float)
+    parser.add_argument("--sync_free", help='[port] no per-step device->host reads (always on with --device xla).',
+                        action='store_true')
+    parser.add_argument("--xla_matmul_precision", help='[port] TPU matmul precision: default (bf16, fastest), '
+                        'high, or highest (~fp32).', default='default', choices=['default', 'high', 'highest'])
+    parser.add_argument("--skip_final_sample", help='[port] do not sample after training finishes.',
+                        action='store_true')
 
     # DEV. params - do not modify
     parser.add_argument("--sample_limited_t", help='limit t in each scale to stop at the start of the next scale', action='store_true')
@@ -69,14 +75,24 @@ def main():
     args = parser.parse_args()
 
     print('num devices: '+ str(torch.cuda.device_count()))
-    # [port] allow CPU (local tests) and auto-detection
-    if args.device == 'auto':
+    # [port] allow CPU (local tests), TPU (torch_xla) and auto-detection
+    use_xla = args.device == 'xla'
+    if use_xla:
+        import torch_xla
+        import torch_xla.core.xla_model as xm
+        device = xm.xla_device()
+        try:  # torch_xla >= 2.6
+            import torch_xla.backends
+            torch_xla.backends.set_mat_mul_precision(args.xla_matmul_precision)
+        except Exception as e:
+            print(f'[port] could not set XLA matmul precision ({e!r}); using the torch_xla default')
+    elif args.device == 'auto':
         device = f"cuda:{args.device_num}" if torch.cuda.is_available() else "cpu"
     elif args.device == 'cuda':
         device = f"cuda:{args.device_num}"
     else:
         device = args.device
-    print(f'[port] device: {device}')
+    print(f'[port] device: {device}' + (f' (matmul precision: {args.xla_matmul_precision})' if use_xla else ''))
     if args.seed is not None:
         import random
         random.seed(args.seed)
@@ -161,11 +177,16 @@ def main():
         completed = ScaleTrainer.train(
             time_budget_s=None if args.time_budget_min is None else args.time_budget_min * 60,
             checkpoint_every_s=None if args.checkpoint_every_min is None else args.checkpoint_every_min * 60,
+            sync_free=args.sync_free,
+            xla=use_xla,
         )
+        if use_xla:
+            xm.wait_device_ops()  # [port] make wall-clock timings include all queued TPU work
         if not completed:
             print('[port] stopped by time budget; rerun with --resume to continue')
             return
-        # Sample after training is complete
+        if args.skip_final_sample:
+            return
         # Sample after training is complete
         ScaleTrainer.sample_scales(scale_mul=(1, 1),    # H,W
                                    custom_sample=True,
