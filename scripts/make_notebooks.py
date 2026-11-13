@@ -105,6 +105,63 @@ print("saved", f"{DRIVE_ROOT}/env_logs/{stamp}_{NOTEBOOK}_freeze.txt")
 '''
 
 
+SINDDM_CLONE = '''
+SINDDM = "/content/SinDDM"
+if not os.path.exists(SINDDM):
+    subprocess.run(["git", "clone", "-q", "https://github.com/fallenshock/SinDDM", SINDDM], check=True)
+subprocess.run(["git", "-C", SINDDM, "checkout", "-q", "--", "."], check=True)
+subprocess.run(["git", "-C", SINDDM, "checkout", "-q", SINDDM_COMMIT], check=True)
+shutil.copytree(f"{PROJECT}/patches/sinddm_port", SINDDM, dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("CHANGES.diff"))
+!pip install -q einops ftfy scikit-image
+print(subprocess.run(["git", "-C", SINDDM, "status", "--short"], capture_output=True, text=True).stdout)
+'''
+
+
+def sinddm_bench(device_args: str, table_name: str, label: str) -> str:
+    """Steady-state SinDDM training speed, identical on GPU and TPU (only ``device_args`` differ)."""
+    return '''
+import time, json, re
+from PIL import Image
+DEVICE_ARGS = "__DEVICE_ARGS__"
+os.chdir(SINDDM)
+def make_input(name, short_side=None):
+    d = f"/content/sinddm_bench/{name}/"; os.makedirs(d, exist_ok=True)
+    im = Image.open(f"{SINDDM}/datasets/balloons/balloons.png").convert("RGB")
+    if short_side:
+        w, h = im.size; s = short_side / min(w, h)
+        im = im.resize((round(w * s), round(h * s)), Image.LANCZOS)
+    im.save(d + f"{name}.png"); return d, im.size
+
+def train_seconds(scope, folder, image, steps):
+    cmd = (f"python main.py --scope {scope} --mode train --dataset_folder {folder} --image_name {image} "
+           f"--results_folder /content/sinddm_bench/results_{steps}/ --train_num_steps {steps} "
+           f"--save_and_sample_every 1000000 --checkpoint_every_min 1000 --skip_final_sample --seed 0 {DEVICE_ARGS}")
+    t0 = time.time()
+    out = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    dt = time.time() - t0
+    losses = re.findall(r"step:(\\d+) loss:([0-9.eE+-]+)", out.stdout)
+    if out.returncode != 0 or "training completed" not in out.stdout:
+        print(out.stdout[-2000:], out.stderr[-3000:])
+        raise RuntimeError(f"training failed ({scope}, {steps} steps)")
+    return dt, losses
+
+results = {"device": "__LABEL__", "device_args": DEVICE_ARGS}
+for name, short in (("bench_native", None), ("bench_128", 128)):
+    folder, size = make_input(name, short)
+    t100, _ = train_seconds(name, folder, f"{name}.png", 100)
+    t400, losses = train_seconds(name, folder, f"{name}.png", 400)
+    per_1000 = (t400 - t100) / 300 * 1000
+    results[name] = {"input_wh": list(size), "wall_100_steps_s": round(t100, 1), "wall_400_steps_s": round(t400, 1),
+                     "steady_seconds_per_1000_steps": round(per_1000, 1),
+                     "full_120k_schedule_hours": round(per_1000 * 120 / 3600, 1),
+                     "loss_trace_400": [(int(a), round(float(b), 4)) for a, b in losses]}
+    print(f"{name} {size}: {per_1000:.1f} s / 1000 steps  ->  full 120k schedule ~{per_1000*120/3600:.1f} h")
+json.dump(results, open(f"{DRIVE_ROOT}/tables/__TABLE__", "w"), indent=2)
+print("saved", f"{DRIVE_ROOT}/tables/__TABLE__")
+'''.replace("__DEVICE_ARGS__", device_args).replace("__TABLE__", table_name).replace("__LABEL__", label)
+
+
 # ---------------------------------------------------------------------------
 # 00 — setup + smoke test + T4 timing
 # ---------------------------------------------------------------------------
@@ -230,17 +287,7 @@ This notebook:
         code(SETTINGS + '\nNOTEBOOK = "05_sinddm_port"'),
         code(GPU_CHECK),
         code(MOUNT_AND_CODE),
-        code('''
-SINDDM = "/content/SinDDM"
-if not os.path.exists(SINDDM):
-    subprocess.run(["git", "clone", "-q", "https://github.com/fallenshock/SinDDM", SINDDM], check=True)
-subprocess.run(["git", "-C", SINDDM, "checkout", "-q", "--", "."], check=True)
-subprocess.run(["git", "-C", SINDDM, "checkout", "-q", SINDDM_COMMIT], check=True)
-shutil.copytree(f"{PROJECT}/patches/sinddm_port", SINDDM, dirs_exist_ok=True,
-                ignore=shutil.ignore_patterns("CHANGES.diff"))
-!pip install -q einops ftfy
-print(subprocess.run(["git", "-C", SINDDM, "status", "--short"], capture_output=True, text=True).stdout)
-'''),
+        code(SINDDM_CLONE),
         md('## 1 · Sample the 3 official pretrained models (validates the port)'),
         code('''
 %cd {SINDDM}
@@ -260,34 +307,13 @@ for scope in ("forest", "night_sky", "pyramids"):
     if grid:
         print(scope); display(IPImage(grid[-1], width=600))
 '''),
-        md('## 2 · Training speed (seconds per 1 000 steps)'),
-        code('''
-import time, json
-from PIL import Image
-def make_input(name, short_side=None):
-    d = f"/content/sinddm_bench/{name}/"; os.makedirs(d, exist_ok=True)
-    im = Image.open(f"{SINDDM}/datasets/balloons/balloons.png").convert("RGB")
-    if short_side:
-        w, h = im.size; s = short_side / min(w, h)
-        im = im.resize((round(w * s), round(h * s)), Image.LANCZOS)
-    im.save(d + f"{name}.png"); return d, im.size
-
-results = {}
-for name, short in (("bench_native", None), ("bench_128", 128)):
-    folder, size = make_input(name, short)
-    cmd = (f"python main.py --scope {name} --mode train --dataset_folder {folder} --image_name {name}.png "
-           f"--results_folder /content/sinddm_bench/results/ --train_num_steps 1000 --save_and_sample_every 1000000 "
-           f"--time_budget_min 20 --checkpoint_every_min 100 --sample_batch_size 1 --seed 0 "
-           f"2>&1 | grep -E 'step:|port|completed' | tail -3")
-    t0 = time.time()
-    !{cmd}
-    results[name] = {"input_wh": size, "seconds_per_1000_steps_incl_final_sampling": round(time.time() - t0, 1)}
-print(json.dumps(results, indent=2))
-full = 120_000
-for k, v in results.items():
-    print(f"{k}: full 120k-step schedule would take ~{v['seconds_per_1000_steps_incl_final_sampling'] * full / 1000 / 3600:.1f} h on this GPU (upper bound)")
-json.dump(results, open(f"{DRIVE_ROOT}/tables/phase2_sinddm_timing.json", "w"), indent=2)
+        md('''
+## 2 · Training speed (steady-state seconds per 1 000 steps)
+Each size is trained twice from scratch, for 100 and for 400 steps. The difference divided by 300 gives the
+steady-state cost per step, with start-up (and, on TPU, graph compilation) cancelled out. Notebook 07
+uses the identical method on the TPU, so the two numbers are directly comparable.
 '''),
+        code(sinddm_bench("", "phase2_sinddm_timing.json", "T4 GPU")),
         md('## 3 · Stop-and-resume test (checkpoints on Drive)'),
         code('''
 ck = f"{DRIVE_ROOT}/checkpoints/sinddm_resume_test/"
@@ -366,6 +392,100 @@ display(imgs[0])
     ]
 
 
+# ---------------------------------------------------------------------------
+# 07 — TPU (free Colab v5e-1): SinDDM training speed vs the T4
+# ---------------------------------------------------------------------------
+
+def nb_tpu():
+    return [
+        md('''
+# 07 · Free Colab TPU (v5e-1): can it train SinDDM faster than the T4? (Phase 2, optional)
+
+**Runtime → Change runtime type → *v5e-1 TPU*** (the free-tier TPU; v2-8 was retired in 2025). Then *Run all*.
+About 30–45 min, mostly XLA graph compilation on the first run.
+
+**Why only SinDDM.** SinDDM training is the one compute bottleneck of this project (~7–8 h/image on an
+A6000). Everything else stays on the T4:
+- The paper's method has nothing to train, and its code is CUDA-only.
+- LoRA takes only ~20–40 min/image on a T4.
+
+**How.** PyTorch/XLA runs our SinDDM port with `--device xla`. That mode:
+- never syncs device→host inside the training loop;
+- cuts one XLA graph per step;
+- writes checkpoints as CPU tensors, so a TPU-trained model loads and samples on the T4 or a CPU.
+
+**Precision note.** By default, TPU matmuls use bf16 passes (`--xla_matmul_precision default`). The T4
+trains in fp32. Both are normal for diffusion training, but report it if TPU-trained models are used.
+
+**Decision rule.** Use the TPU for Phase-8 SinDDM training only if it is **≥ 2× faster** than the T4 at the
+same image size *and* its loss trace looks like the T4's. Otherwise stay on the T4.
+'''),
+        code(SETTINGS + '\nNOTEBOOK = "07_tpu_sinddm"\nTORCH_XLA_VERSION = "2.8.0"   # torch and torch_xla must match; try "2.7.0" if this fails'),
+        code('''
+import os, glob, subprocess
+print("TPU_ACCELERATOR_TYPE =", os.environ.get("TPU_ACCELERATOR_TYPE"), "| /dev/accel*:", glob.glob("/dev/accel*") or glob.glob("/dev/vfio/*"))
+assert os.environ.get("TPU_ACCELERATOR_TYPE") or glob.glob("/dev/accel*") or glob.glob("/dev/vfio/*"), \\
+    "No TPU: Runtime > Change runtime type > v5e-1 TPU (then rerun)."
+'''),
+        code(MOUNT_AND_CODE),
+        md('## Install PyTorch/XLA (matching torch) and smoke-test the TPU'),
+        code('''
+TORCHVISION = {"2.8.0": "0.23.0", "2.7.0": "0.22.0", "2.6.0": "0.21.0"}[TORCH_XLA_VERSION]  # SinDDM imports torchvision
+!pip install -q "torch=={TORCH_XLA_VERSION}" "torchvision=={TORCHVISION}" "torch_xla[tpu]=={TORCH_XLA_VERSION}" -f https://storage.googleapis.com/libtpu-releases/index.html -f https://storage.googleapis.com/libtpu-wheels/index.html
+probe = subprocess.run(["python", "-c",
+    "import torch, torch_xla, torch_xla.core.xla_model as xm; d = xm.xla_device(); "
+    "a = torch.randn(1024, 1024, device=d); b = (a @ a).sum(); xm.mark_step(); "
+    "print('torch', torch.__version__, '| torch_xla', torch_xla.__version__, '| device', d, '| ok', float(b) == float(b))"],
+    capture_output=True, text=True)
+print(probe.stdout[-1500:], probe.stderr[-3000:])
+assert probe.returncode == 0, "PyTorch/XLA does not work on this runtime -> try another TORCH_XLA_VERSION, or stay on the T4"
+'''),
+        code(SINDDM_CLONE),
+        md('''
+## Steady-state training speed on the TPU
+Same method as notebook 05 (100 vs 400 steps, the difference ÷ 300), so compilation cost cancels out.
+'''),
+        code(sinddm_bench("--device xla --xla_matmul_precision default", "phase2_sinddm_timing_tpu.json",
+                          "TPU v5e-1 (PyTorch/XLA)")),
+        md('## Compare with the T4 (from notebook 05) and decide'),
+        code('''
+t4_path = f"{DRIVE_ROOT}/tables/phase2_sinddm_timing.json"
+tpu = json.load(open(f"{DRIVE_ROOT}/tables/phase2_sinddm_timing_tpu.json"))
+if not os.path.exists(t4_path):
+    print("Run notebook 05 on a T4 first to get the GPU numbers; TPU numbers are saved.")
+else:
+    t4 = json.load(open(t4_path))
+    for name in ("bench_native", "bench_128"):
+        g, t = t4[name]["steady_seconds_per_1000_steps"], tpu[name]["steady_seconds_per_1000_steps"]
+        print(f"{name}: T4 {g:.0f} s/1k steps | TPU {t:.0f} s/1k steps | speed-up x{g / t:.2f}")
+        print("   T4  loss:", t4[name]["loss_trace_400"])
+        print("   TPU loss:", tpu[name]["loss_trace_400"])
+    speedups = [t4[n]["steady_seconds_per_1000_steps"] / tpu[n]["steady_seconds_per_1000_steps"]
+                for n in ("bench_native", "bench_128")]
+    print("\\nDECISION:", "use the TPU for SinDDM training (Phase 8)" if min(speedups) >= 2
+          else "stay on the T4 (TPU gain < 2x)")
+'''),
+        md('''
+## Optional: precision check
+If the TPU is faster, also time `--xla_matmul_precision highest` (≈ fp32, slower).
+Then you can report how much of the gain comes from bf16 matmuls.
+'''),
+        code(sinddm_bench("--device xla --xla_matmul_precision highest", "phase2_sinddm_timing_tpu_highest.json",
+                          "TPU v5e-1 (PyTorch/XLA, highest precision)")),
+        md('## Cross-device check: a TPU-trained checkpoint loads on CPU'),
+        code('''
+import collections, torch
+ck = sorted(glob.glob("/content/sinddm_bench/results_400/bench_128/model-last.pt"))[0]
+with torch.serialization.safe_globals([collections.Counter]):
+    data = torch.load(ck, map_location="cpu", weights_only=True)
+devs = {v.device.type for v in data["model"].values()}
+print("checkpoint step", data["step"], "| tensor devices:", devs)
+assert devs == {"cpu"}
+'''),
+        code(FREEZE),
+    ]
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     meta = {"kernelspec": {"name": "python3", "display_name": "Python 3"},
@@ -373,8 +493,12 @@ def main() -> None:
             "colab": {"provenance": [], "gpuType": "T4"}}
     for fname, cells in (("00_setup_smoke.ipynb", nb_setup_smoke()),
                          ("05_sinddm_port.ipynb", nb_sinddm()),
-                         ("06_lora_smoke.ipynb", nb_lora())):
-        nb = nbf.v4.new_notebook(cells=cells, metadata=meta)
+                         ("06_lora_smoke.ipynb", nb_lora()),
+                         ("07_tpu_sinddm.ipynb", nb_tpu())):
+        nb_meta = dict(meta)
+        if fname.startswith("07"):
+            nb_meta = {**meta, "accelerator": "TPU", "colab": {"provenance": [], "gpuType": "V5E1"}}
+        nb = nbf.v4.new_notebook(cells=cells, metadata=nb_meta)
         nbf.validate(nb)
         nbf.write(nb, OUT / fname)
         print("wrote", OUT / fname)

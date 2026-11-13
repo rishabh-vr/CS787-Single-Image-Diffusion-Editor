@@ -30,6 +30,17 @@ except:
     APEX_AVAILABLE = False
 
 
+def _to_cpu(obj):
+    """[port] Recursively move tensors to CPU (checkpoints must not hold XLA/CUDA tensors)."""
+    if torch.is_tensor(obj):
+        return obj.detach().cpu()
+    if isinstance(obj, dict):
+        return type(obj)((k, _to_cpu(v)) for k, v in obj.items())
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_to_cpu(v) for v in obj)
+    return obj
+
+
 # dataset classes
 
 class Dataset(data.Dataset):
@@ -165,9 +176,11 @@ class MultiscaleTrainer(object):
             'ema': self.ema_model.state_dict(),
             'sched': self.scheduler.state_dict(),
             'opt': self.opt.state_dict(),  # [port] needed to resume training across Colab sessions
-            'running_loss': self.running_loss,
+            'running_loss': [float(v) for v in self.running_loss],
             'running_scale': self.running_scale
         }
+        # [port] checkpoints always hold CPU tensors, so one trained on a TPU (XLA) loads on a GPU/CPU
+        data = _to_cpu(data)
         # [port] write to a temp file then rename, so a disconnect mid-save never corrupts a checkpoint
         final_path = self.results_folder / f'model-{milestone}.pt'
         tmp_path = self.results_folder / f'model-{milestone}.pt.tmp'
@@ -187,7 +200,9 @@ class MultiscaleTrainer(object):
         # that one type, rather than falling back to full (code-executing) unpickling.
         import collections
         with torch.serialization.safe_globals([collections.Counter]):
-            data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location=self.device,
+            # [port] load to CPU; load_state_dict copies onto the model's device (CUDA, CPU or XLA),
+            # and Optimizer.load_state_dict moves its state next to the parameters.
+            data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location='cpu',
                               weights_only=True)
 
         self.step = data['step']
@@ -199,19 +214,30 @@ class MultiscaleTrainer(object):
         self.running_loss = data['running_loss']
     #    self.running_scale = data['running_scale']
 
-    def train(self, time_budget_s=None, checkpoint_every_s=None):
+    def train(self, time_budget_s=None, checkpoint_every_s=None, sync_free=False, xla=False):
         """[port] Returns True when train_num_steps is reached, False when stopped by the time budget.
 
         time_budget_s: stop cleanly (saving 'model-last.pt') once this many seconds have elapsed.
         checkpoint_every_s: also save 'model-last.pt' this often, so a disconnect loses little work.
+        sync_free: never read device values back to the host inside the loop. The scale index is drawn
+            on the host (same distribution as torch.multinomial over num_timesteps_trained, a different
+            random stream), and the loss is accumulated on-device and read only every avg_window steps.
+            Required for good speed on TPU (XLA); harmless elsewhere.
+        xla: running on a TPU through torch_xla — cut the lazy graph once per step (xm.mark_step).
         """
         import time as _time
+        import random as _random
         t_start = _time.time()
         t_last_ckpt = t_start
+        sync_free = sync_free or xla
+        if xla:
+            import torch_xla.core.xla_model as xm
 
         backwards = partial(loss_backwards, self.fp16)
         loss_avg = 0
         s_weights = torch.tensor(self.model.num_timesteps_trained, device=self.device, dtype=torch.float)
+        s_weights_host = [float(w) for w in self.model.num_timesteps_trained]
+        scales = list(range(len(s_weights_host)))
         while self.step < self.train_num_steps:
             now = _time.time()
             if time_budget_s is not None and now - t_start >= time_budget_s:
@@ -224,16 +250,23 @@ class MultiscaleTrainer(object):
                 print(f'[port] periodic checkpoint at step {self.step}')
 
             # t weighted multinomial sampling
-            s = torch.multinomial(input=s_weights, num_samples=1)  # uniform when train_full_t = True
+            if sync_free:  # [port] host-side draw: a plain int, so no device->host read per step
+                s = _random.choices(scales, weights=s_weights_host, k=1)[0]
+            else:
+                s = torch.multinomial(input=s_weights, num_samples=1)  # uniform when train_full_t = True
             for i in range(self.gradient_accumulate_every):
                 data = self.data_list[s]
                 loss = self.model(data, s)
-                loss_avg += loss.item()
+                if sync_free:
+                    loss_avg = loss_avg + loss.detach()  # stays on device
+                else:
+                    loss_avg += loss.item()
                 backwards(loss / self.gradient_accumulate_every, self.opt)
 
             if self.step % self.avg_window == 0:
-                print(f'step:{self.step} loss:{loss_avg/self.avg_window}')
-                self.running_loss.append(loss_avg/self.avg_window)
+                avg = float(loss_avg) / self.avg_window  # the only host read in sync_free mode
+                print(f'step:{self.step} loss:{avg}')
+                self.running_loss.append(avg)
                 loss_avg = 0
             self.opt.step()
             self.opt.zero_grad()
@@ -241,6 +274,8 @@ class MultiscaleTrainer(object):
             if self.step % self.update_ema_every == 0:
                 self.step_ema()
             self.scheduler.step()
+            if xla:
+                xm.mark_step()  # [port] execute this step's graph on the TPU
             self.step += 1
             if self.step % self.save_and_sample_every == 0:
                 milestone = self.step // self.save_and_sample_every
