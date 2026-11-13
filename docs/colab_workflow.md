@@ -5,9 +5,9 @@ This page is the how-to; the reasons behind it are in PROJECT_PLAN.md §5–§6.
 
 ## 1. One-time setup
 
-1. **Code on GitHub.** The notebooks clone `https://github.com/rishabh-vr/CS787-training-free-single-image-diffusion` (private). The project files are at the repo root.
+1. **Code on GitHub.** The notebooks clone `https://github.com/rishabh-vr/CS787-training-free-single-image-diffusion` (**public**, so no token is needed). The project files are at the repo root.
    - The `.gitignore` keeps `.venv/`, `external/` clones and outputs out of git.
-   - Because the repo is **private**, create a fine-grained, **read-only** GitHub token for that repo (GitHub → Settings → Developer settings → Fine-grained tokens → *Only select repositories* → *Contents: Read-only*). In Colab, add it as a secret named `GH_TOKEN` (key icon in the left sidebar, then enable notebook access).
+   - If the repo is ever made private again: create a fine-grained, read-only token and add it in Colab as the secret `GH_TOKEN`. The notebooks already use it when present.
    - Alternative: upload `Project/` (without `.venv`/`external`) to `MyDrive/CS787/code/Project` and set `CODE_SOURCE = "drive"` in the notebook's first cell.
 2. **Google Drive layout** (created automatically): `MyDrive/CS787/{outputs, checkpoints, tables, env_logs, data}`.
 3. **Optional:** a free Hugging Face account, with the FLUX.1-schnell terms accepted. This is only needed for the latent-space ablation AB5.
