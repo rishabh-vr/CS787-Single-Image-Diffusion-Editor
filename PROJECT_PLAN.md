@@ -639,7 +639,7 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** the code may contain undocumented heuristics; notation mismatches (S vs S+1).
 - **Done when:** every [?] is resolved or explicitly logged as "unknown + how we handle it", and every team member can explain the pipeline in §2.3.
 
-#### Phase 2 — Environment & infrastructure setup (free Colab + laptop) — 🟡 LOCAL PART DONE, COLAB RUNS PENDING
+#### Phase 2 — Environment & infrastructure setup (free Colab + laptop) — 🟡 MOSTLY DONE (notebook 00 + optional 07 pending)
 
 > **Status (2026-11-13).** How-to: [docs/colab_workflow.md](docs/colab_workflow.md).
 >
@@ -662,7 +662,12 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 > - run the 3 notebooks;
 > - paste the timing tables into §5.3.
 >
-> **Not yet verified:** the `sid_official` wrapper and SinDDM pretrained-checkpoint loading both need a GPU, so they are first exercised by notebooks 00 and 05.
+> **Not yet verified:** the `sid_official` wrapper needs a GPU and is first exercised by notebook 00.
+>
+> **Measured on Colab (2026-11-13, T4, torch 2.14.1 + CUDA 13.0):**
+> - Notebook 05 (SinDDM port): the 3 pretrained models sample; training 1 395 s / 1 000 steps at 248×186 (≈ 46.5 h for the full 120k schedule) and 712 s / 1 000 steps at 171×128 (≈ 23.7 h); stop/resume works.
+> - Notebook 06 (LoRA, SD 1.5): 50 steps in 191 s incl. model download; sampling 5.9 s/image; 2.6 GB peak VRAM.
+> - Notebook 07 (TPU): the Colab TPU image now ships `torch_tpu`, which breaks torch_xla 2.8; fixed in the notebook, rerun pending.
 >
 > **New findings:**
 > - `clip` is required even for unconditional runs.
@@ -703,7 +708,13 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
   - SinDDM pretrained sampling works;
   - the timing table exists and §5.3 is updated.
 
-#### Phase 3 — Natural dataset acquisition & preparation
+#### Phase 3 — Natural dataset acquisition & preparation — ✅ DONE (2026-11-13)
+
+> **Output:** `scripts/prepare_natural.py` → `data/manifests/*.csv` (committed) + `data/natural/` (gitignored).
+> - 59 images in 6 sets: sinddm15 (15, 167–200 × 249–298 px, i.e. the paper's ~250 px regime), retarget (14), symmetric (10), tileable (8), structural analogy (4), text style (8).
+> - Each manifest row: id, path, size, **sha256**, source, licence, and 6 descriptors. `--verify` re-checks the hashes on any machine (notebook 10 does this on Colab).
+> - **Descriptor set changed from §4.3:** "patch_rarity_entropy" became two measures — `patch_code_entropy` (3×3 census-code entropy: local structural variety) and `rare_patch_fraction` (share of 7×7 patches whose nearest non-overlapping neighbour is > 2× the median distance: the rare-detail risk). `periodicity_score` is computed on the high-passed image and requires repetition along **both** axes, so smooth skies and single straight lines do not count as periodic (natural images 0.03–0.20, bricks 0.45, grid texture 0.62, perfect grid 1.0).
+
 - **Objective:** have the paper's benchmark data ready for reproduction.
 - **Tasks:**
   1. `python datasets/download_data.py uncond/sinddm15`, plus the figure sets needed for qualitative checks (retarget, symmetric, tileable, analogy, text style). Skip gigapixel.
@@ -720,7 +731,17 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 
 ### Stage II — Reproduction
 
-#### Phase 4 — Reproduction of the original method
+#### Phase 4 — Reproduction of the original method — 🟡 4b DONE (our core), 4a QUEUED ON COLAB
+
+> **4b — our core (`src/sidx/core`, ~400 lines) is implemented and validated on the laptop CPU.**
+> - Modules as planned (resize, pyramid, patches, denoiser with dense/chunked/SDPA backends and winning-patch logging, schedule, sampler, hooks); inversion is deferred to Phase 5 (R7). Our resampler re-expresses ResizeRight as per-axis matrices (≤ 3·10⁻⁷ from the official one).
+> - Exposed to the runner as method `sid_core`, which runs on CPU **and** CUDA (the official code is CUDA-only), so small synthetic sweeps can run on the laptop.
+> - **Equivalence with the official code** (`tests/test_core_equivalence.py`, `src/sidx/core/official_cpu.py`): the official modules are assembled on CPU and both samplers run with the same seed in fp32. At 48×64, patch 7, 3 scales, η ∈ {0, 0.5, 1}: mean difference ≤ 0.003 grey levels, < 0.1 % of pixels differ by > 1 grey level (isolated near-tie flips of the σ = 10⁻⁴ hard patch pick). Full paper preset: see `reports/equivalence/`.
+> - Found along the way: notes **D14** (official η > 0 noise depends on tensor memory layout) and **D15** (fp32 underflow of border weights at ρ = 0.1).
+> - Tests: 38 CPU tests pass (runner 6, core 23, equivalence 5, descriptors 4).
+>
+> **4a — official runs:** `configs/jobs/phase4_reproduction.yaml`, run with `notebooks/10_run_queue.ipynb` over several sessions: Table-1 row (15 × 50), our core on 5 seeds (GPU equivalence), T = 40/η = 1 and ANN k = 5 variants (15 × 20 each). ≈ 1 425 samples.
+
 - **Objective:** generate outputs with (a) the official code and (b) our own validated re-implementation of the core.
 - **Tasks:**
   1. **4a — Official runs:** run `configs/uncond/paper_sinddm15.yaml` on all 15 images, 50 samples each (seeds `10+i`). Also run the ANN (k=5) and T=40/η=1 variants.
