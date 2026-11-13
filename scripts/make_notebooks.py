@@ -354,14 +354,17 @@ The input image is a placeholder (the balloons example). The real images come in
         code(MOUNT_AND_CODE),
         code('''
 DIFFUSERS_VERSION = "0.35.1"
-!pip install -q diffusers=={DIFFUSERS_VERSION} transformers==4.53.2 accelerate==1.9.0 peft bitsandbytes
+# peft is pinned: the newest peft refuses to load next to Colab's preinstalled torchao 0.10 ("only versions
+# above 0.16.0 are supported"). We never use torchao, so it is also removed, which skips that check entirely.
+!pip uninstall -q -y torchao
+!pip install -q diffusers=={DIFFUSERS_VERSION} transformers==4.53.2 accelerate==1.9.0 peft==0.17.1 bitsandbytes
 !wget -q -O /content/train_dreambooth_lora.py https://raw.githubusercontent.com/huggingface/diffusers/v{DIFFUSERS_VERSION}/examples/dreambooth/train_dreambooth_lora.py
 !accelerate config default
 os.makedirs("/content/lora_inst", exist_ok=True)
 !wget -q -O /content/lora_inst/img.png https://raw.githubusercontent.com/haojunqiu/efficient-SID-code/{SID_COMMIT}/examples/uncond/balloons.png
 '''),
         code('''
-import time, json, torch
+import time, json, glob, subprocess, torch
 cmd = ("accelerate launch /content/train_dreambooth_lora.py "
        "--pretrained_model_name_or_path=stable-diffusion-v1-5/stable-diffusion-v1-5 "
        "--instance_data_dir=/content/lora_inst --instance_prompt='a photo in the style of sks' "
@@ -369,8 +372,10 @@ cmd = ("accelerate launch /content/train_dreambooth_lora.py "
        "--learning_rate=1e-4 --lr_scheduler=constant --lr_warmup_steps=0 --max_train_steps=50 --rank=8 "
        "--mixed_precision=fp16 --gradient_checkpointing --use_8bit_adam --checkpointing_steps=1000 --seed=0")
 t0 = time.time()
-!{cmd}
+ret = subprocess.run(cmd, shell=True).returncode
 train_s = time.time() - t0
+assert ret == 0 and glob.glob("/content/lora_out/pytorch_lora_weights.*"), \\
+    "LoRA training FAILED (see the error above) - no weights were written; send the error output"
 print(f"50 steps (incl. model download): {train_s:.0f} s")
 '''),
         code('''
