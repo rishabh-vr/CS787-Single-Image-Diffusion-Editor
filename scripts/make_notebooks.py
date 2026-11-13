@@ -34,7 +34,7 @@ def code(text: str):
 SETTINGS = f'''
 # ==== SETTINGS (edit once) ====================================================================
 CODE_SOURCE   = "github"                                      # "github" or "drive"
-GITHUB_REPO   = "https://github.com/rishabh-vr/CS787-training-free-single-image-diffusion.git"
+GITHUB_REPO   = "https://github.com/rishabh-vr/CS787-Single-Image-Diffusion-Editor.git"
 GITHUB_BRANCH = "main"
 REPO_SUBDIR   = ""                                            # project files are at the repo root
 DRIVE_CODE    = "/content/drive/MyDrive/CS787/code/Project"   # used when CODE_SOURCE == "drive"
