@@ -1,0 +1,59 @@
+# Phase 2 — T4 timing calibration (free Colab). ~15–20 min of GPU time [estimate].
+# Produces the timing table that recalibrates PROJECT_PLAN.md §5.3.
+#
+#   python scripts/run_queue.py configs/jobs/phase2_t4_timing.yaml \
+#       --out-root /content/drive/MyDrive/CS787/outputs --budget-min 60 --var SID_ROOT=/content/efficient-SID-code
+#
+# Image: the official example balloons.png (248x186 = the sinddm15 balloons image).
+# All jobs use the Table-1 preset; only precision / size / backend change.
+
+experiment: phase2_t4_timing
+
+defaults:
+  method: sid_official
+  seeds: {start: 10, count: 3}
+  images:
+    - {id: balloons, path: "{SID_ROOT}/examples/uncond/balloons.png"}
+
+jobs:
+  # 1. Paper preset in float32 (our standard T4 setting). The dense N x N score matrix is 6.5 GB in fp32 and
+  #    the kernel holds ~2 such tensors at once (~13 GB) -> 2 query chunks (identical maths, half the memory).
+  - name: paper_fp32_native
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.query_chunks=2]
+
+  # 2. Paper preset exactly as shipped (bf16 tensors + "float32" bottleneck). T4 has no native bf16:
+  #    expect it to be slower; compare outputs with job 1 (notes D2/D3).
+  - name: paper_shipped_bf16_native
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [image_denoiser.patch_denoiser.query_chunks=2]   # memory only; maths unchanged
+
+  # 3. Fused-attention backend, fp32 — does it run on a T4 and how much faster is it?
+  - name: flash_fp32_native
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.type=exact_flash_attn]
+
+  # 4. 256x256 (our OOD resolution). Dense 58.5k x 58.5k fp32 ≈ 13.7 GB -> 4 query chunks.
+  - name: paper_fp32_256sq_chunk4
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  "input_resize_to=(256,256)", image_denoiser.patch_denoiser.query_chunks=4]
+
+  - name: flash_fp32_256sq
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  "input_resize_to=(256,256)", image_denoiser.patch_denoiser.type=exact_flash_attn]
+
+  # 5. 128 px (our synthetic-set resolution); 3 scales so the coarsest stays >= patch size.
+  - name: paper_fp32_128_3scales
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  "input_resize_to=(128,171)", pyramid.num_scales=3]

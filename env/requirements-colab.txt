@@ -1,0 +1,7 @@
+# Installed on top of Colab's preinstalled torch/torchvision/numpy/pillow/pyyaml (do NOT reinstall torch).
+omegaconf==2.3.0
+# The official package's config.py imports applications/text_style.py -> clip_extractor.py -> `import clip`,
+# so CLIP is required even for unconditional generation. clip-anytorch does `from pkg_resources import packaging`,
+# which works with setuptools < 70 (verified locally with 69.5.1; it fails on 70.0.0).
+setuptools<70
+clip-anytorch==2.6.0
