@@ -1,4 +1,6 @@
-# CS787 — Training-Free Single-Image Diffusion: Reproduction, OOD Study, Baselines
+# CS787 — Single-Image Diffusion Editor
+
+*Training-free single-image diffusion: reproduction, out-of-distribution study and baselines.*
 
 Course project (CS787) built on **Qiu, Kutulakos & Lindell, *Efficient and Training-Free Single-Image Diffusion Models*** (arXiv:2606.04299; official code: [haojunqiu/efficient-SID-code](https://github.com/haojunqiu/efficient-SID-code), MIT).
 

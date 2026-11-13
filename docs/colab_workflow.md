@@ -5,7 +5,7 @@ This page is the how-to; the reasons behind it are in PROJECT_PLAN.md §5–§6.
 
 ## 1. One-time setup
 
-1. **Code on GitHub.** The notebooks clone `https://github.com/rishabh-vr/CS787-training-free-single-image-diffusion` (**public**, so no token is needed). The project files are at the repo root.
+1. **Code on GitHub.** The notebooks clone `https://github.com/rishabh-vr/CS787-Single-Image-Diffusion-Editor` (**public**, so no token is needed). The project files are at the repo root.
    - The `.gitignore` keeps `.venv/`, `external/` clones and outputs out of git.
    - If the repo is ever made private again: create a fine-grained, read-only token and add it in Colab as the secret `GH_TOKEN`. The notebooks already use it when present.
    - Alternative: upload `Project/` (without `.venv`/`external`) to `MyDrive/CS787/code/Project` and set `CODE_SOURCE = "drive"` in the notebook's first cell.
