@@ -282,7 +282,7 @@ On paper it is much faster than a T4 for bf16 matmuls (v5e ≈ 197 TFLOP/s bf16 
 Caveats:
 - TPU matmuls default to bf16 passes, while the T4 trains in fp32. Notebook 07 also times `--xla_matmul_precision highest`.
 - torch_xla must match torch exactly (pinned in notebook 07).
-- **Unverified until notebook 07 runs:** whether torch_xla installs cleanly on the free runtime, and the actual speed-up.
+- **Measured (notebook 07, 2026-11-13): the TPU is 0.55–0.79× the T4's speed for SinDDM, so it is not used** (Phase 2 status).
 
 ### 5.3 Free-tier GPU budget (T4-hours) **[E — recalibrated in Phase 2]**
 
@@ -639,7 +639,7 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** the code may contain undocumented heuristics; notation mismatches (S vs S+1).
 - **Done when:** every [?] is resolved or explicitly logged as "unknown + how we handle it", and every team member can explain the pipeline in §2.3.
 
-#### Phase 2 — Environment & infrastructure setup (free Colab + laptop) — 🟡 MOSTLY DONE (notebook 00 + optional 07 pending)
+#### Phase 2 — Environment & infrastructure setup (free Colab + laptop) — 🟡 MOSTLY DONE (notebook 00 outputs to be recorded)
 
 > **Status (2026-11-13).** How-to: [docs/colab_workflow.md](docs/colab_workflow.md).
 >
@@ -667,7 +667,7 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 > **Measured on Colab (2026-11-13, T4, torch 2.14.1 + CUDA 13.0):**
 > - Notebook 05 (SinDDM port): the 3 pretrained models sample; training 1 395 s / 1 000 steps at 248×186 (≈ 46.5 h for the full 120k schedule) and 712 s / 1 000 steps at 171×128 (≈ 23.7 h); stop/resume works.
 > - Notebook 06 (LoRA, SD 1.5): 50 steps in 191 s incl. model download; sampling 5.9 s/image; 2.6 GB peak VRAM.
-> - Notebook 07 (TPU): the Colab TPU image now ships `torch_tpu`, which breaks torch_xla 2.8; fixed in the notebook, rerun pending.
+> - Notebook 07 (free **v5e-1 TPU**, torch_xla 2.8, default bf16 matmul passes): SinDDM trains **slower than on the T4** — 1 765 s / 1 000 steps at 248×186 (T4: 1 395, ×0.79) and 1 297 s at 171×128 (T4: 712, ×0.55). A TPU-written checkpoint loads on CPU (step 400, CPU tensors). **Decision: SinDDM stays on the T4; the TPU path is dropped** (it remains in the port for completeness). Likely reason [H]: a 1.1 M-parameter conv net at batch 32 is far too small to use a TPU, and per-step overhead dominates.
 >
 > **New findings:**
 > - `clip` is required even for unconditional runs.
