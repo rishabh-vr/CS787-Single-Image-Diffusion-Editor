@@ -1,0 +1,12 @@
+# Local laptop (Windows, CPU only). Create with:
+#   python -m venv --system-site-packages .venv      (reuses the installed CPU torch 2.11)
+#   .venv\Scripts\python -m pip install -r env\requirements-local.txt
+#   .venv\Scripts\python -m pip install -e .
+omegaconf==2.3.0
+setuptools<70
+clip-anytorch==2.6.0
+einops            # SinDDM (port tests on CPU)
+scikit-image      # SinDDM + structural metrics
+pyyaml
+pytest
+nbformat

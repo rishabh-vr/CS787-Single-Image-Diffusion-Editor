@@ -1,0 +1,11 @@
+# CPU-only smoke test of the runner (no GPU, no official code needed).
+#   python scripts/run_queue.py configs/jobs/local_dummy_smoke.yaml --out-root outputs_local
+experiment: local_dummy_smoke
+
+jobs:
+  - name: shuffle16
+    method: dummy_shuffle
+    params: {block: 16}
+    images:
+      - {id: balloons, path: "{PROJECT_ROOT}/external/efficient-SID-code/examples/uncond/balloons.png"}
+    seeds: {start: 0, count: 4}
