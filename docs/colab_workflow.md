@@ -85,3 +85,4 @@ python -m venv --system-site-packages .venv          # reuses the installed CPU 
 | Editable installs aren't visible to an already-running kernel | The notebooks also add the paths to `sys.path`; scripts run as subprocesses, which are unaffected |
 | Exact fp32 kernel at ~250 px holds ~2 dense N×N tensors (~13 GB), which is borderline on a T4 | Use `image_denoiser.patch_denoiser.query_chunks=2` (4 at 256×256), or `exact_flash_attn` |
 | SinDDM's pinned torch 1.13 can't be installed on Colab | Use the port in `patches/sinddm_port/` (copied over the pinned clone by notebook 05) |
+| On the TPU runtime, `import torch` fails with "Failed to load the backend extension: torch_tpu" after installing torch_xla | The Colab TPU image ships `torch_tpu` (for torch ≥ 2.11), which torch auto-loads and which crashes with torch_xla's older torch. Notebook 07 uninstalls `torch_tpu` and sets `TORCH_DEVICE_BACKEND_AUTOLOAD=0` |

@@ -8,6 +8,7 @@ Edit the cell text here, not the .ipynb files: regenerating overwrites them.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import nbformat as nbf
@@ -436,6 +437,11 @@ assert os.environ.get("TPU_ACCELERATOR_TYPE") or glob.glob("/dev/accel*") or glo
         md('## Install PyTorch/XLA (matching torch) and smoke-test the TPU'),
         code('''
 TORCHVISION = {"2.8.0": "0.23.0", "2.7.0": "0.22.0", "2.6.0": "0.21.0"}[TORCH_XLA_VERSION]  # SinDDM imports torchvision
+# The Colab TPU image now ships `torch_tpu` (a native backend for torch >= 2.11). torch auto-loads it on
+# `import torch`, and it crashes with the older torch that torch_xla needs. We use torch_xla, so remove it
+# and switch backend auto-loading off (this kernel and every subprocess / ! command inherit os.environ).
+os.environ["TORCH_DEVICE_BACKEND_AUTOLOAD"] = "0"
+!pip uninstall -q -y torch_tpu
 !pip install -q "torch=={TORCH_XLA_VERSION}" "torchvision=={TORCHVISION}" "torch_xla[tpu]=={TORCH_XLA_VERSION}" -f https://storage.googleapis.com/libtpu-releases/index.html -f https://storage.googleapis.com/libtpu-wheels/index.html
 probe = subprocess.run(["python", "-c",
     "import torch, torch_xla, torch_xla.core.xla_model as xm; d = xm.xla_device(); "
@@ -492,6 +498,9 @@ assert devs == {"cpu"}
 
 
 def main() -> None:
+    # Optional filter: `python scripts/make_notebooks.py 07` regenerates only matching notebooks,
+    # so notebooks saved from Colab with outputs (e.g. 05) are not overwritten.
+    only = sys.argv[1:]
     OUT.mkdir(exist_ok=True)
     meta = {"kernelspec": {"name": "python3", "display_name": "Python 3"},
             "language_info": {"name": "python"}, "accelerator": "GPU",
@@ -500,6 +509,8 @@ def main() -> None:
                          ("05_sinddm_port.ipynb", nb_sinddm()),
                          ("06_lora_smoke.ipynb", nb_lora()),
                          ("07_tpu_sinddm.ipynb", nb_tpu())):
+        if only and not any(fname.startswith(p) for p in only):
+            continue
         nb_meta = dict(meta)
         if fname.startswith("07"):
             nb_meta = {**meta, "accelerator": "TPU", "colab": {"provenance": [], "gpuType": "V5E1"}}
