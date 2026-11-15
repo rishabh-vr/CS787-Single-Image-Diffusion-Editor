@@ -40,7 +40,7 @@ jobs:
   # Table 1, "proposed (T=40, eta=1)" (R2): better SIFID, less diversity.
   - name: official_T40_eta1_fp32
     method: sid_official
-    seeds: {start: 10, count: 20}
+    seeds: {start: 10, count: 10}
     params:
       config: configs/uncond/paper_sinddm15.yaml
       overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,

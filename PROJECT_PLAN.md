@@ -297,6 +297,19 @@ Caveats:
 | SinDDM baseline | 3 pretrained (sampling only) + **3 OOD images at reduced budget** | ~12 |
 | **Total** | | **≈ 40 T4-h over ~8 weeks ≈ 5 h/week** (less per person with 2–3 accounts) |
 
+**Measured on the T4 (notebook 00, 2026-11-15; official code, 3 samples each, balloons):**
+
+| Setting | Input | s/sample | Peak VRAM |
+|---|---|---|---|
+| exact fp32 (`dense`, 2 query chunks), paper preset | 186×248 | 13.5 | 9.4 GB |
+| as shipped (bf16 + fp32 kernel) | 186×248 | 13.4 | 9.3 GB |
+| `sdpa` (flash) fp32 | 186×248 | 22.1 | 0.67 GB |
+| exact fp32, 4 query chunks | 256×256 | 31.3 | 10.2 GB |
+| `sdpa` (flash) fp32 | 256×256 | 48.9 | 0.97 GB |
+| exact fp32, 3 scales | 128×171 | 2.9 | 2.5 GB |
+
+Reading: the exact kernel is 1.6× faster than flash on the T4 but needs 10–14× the memory, so it stays the default with chunking. Cost scales with the number of steps, so the T = 40 job costs about 4× the T = 10 job (≈ 54 s/sample). Phase 4 therefore costs about 2.8 h (750 samples, T = 10) + 0.3 h (core check) + 2.3 h (T = 40, 10 seeds) + ANN ≈ **6 T4-h**, not 5.
+
 If Phase 2 measures T4 speed at more than 1.5× these estimates, cut sample counts first (50 → 30 for Track 1), then ablation configurations — never the image count of Track 1.
 
 ### 5.4 Session discipline (makes free Colab workable) **[R]**
