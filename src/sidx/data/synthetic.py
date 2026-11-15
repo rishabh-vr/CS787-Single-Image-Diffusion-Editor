@@ -115,12 +115,13 @@ def render(spec: SynthSpec) -> Image.Image:
     return img.resize((spec.size, spec.size), Image.BOX).convert("RGB")
 
 
-def design() -> List[Tuple[str, str, SynthSpec]]:
+def design(size: int = 128) -> List[Tuple[str, str, SynthSpec]]:
     """One-factor-at-a-time design: (image_id, factor, spec). Every factor level appears once per
-    layout seed; the base B0 is shared by all factors (listed once, factor "base")."""
+    layout seed; the base B0 is shared by all factors (listed once, factor "base").
+    ``size`` is the image side in px (128 = Set B for the GPU; 64 = the laptop pilot, Set B64)."""
     out = []
     for seed in (0, 1):
-        base = replace(BASE, seed=seed)
+        base = replace(BASE, seed=seed, size=size)
         out.append((f"b0_s{seed}", "base", base))
         for factor, levels in FACTORS.items():
             for lv in levels:

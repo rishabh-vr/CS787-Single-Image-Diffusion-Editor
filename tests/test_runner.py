@@ -99,3 +99,17 @@ def test_failed_setup_is_logged_and_skipped(tmp_path, tiny_image):
     job_dir = tmp_path / "out" / exp / f"j__{jobs[0].cfg_hash}"
     assert (job_dir / "missing" / "errors.jsonl").exists()
     assert seed_png(job_dir / "ok", 1).exists()
+
+
+def test_image_filters(tmp_path, tiny_image):
+    f = _job_file(tmp_path, tiny_image, count=1)
+    spec = yaml.safe_load(f.read_text())
+    spec["jobs"][0]["images_exclude"] = ["a"]
+    f.write_text(yaml.safe_dump(spec))
+    _, jobs = load_jobs(f, {})
+    assert [i.id for i in jobs[0].images] == ["b"]
+    spec["jobs"][0].pop("images_exclude")
+    spec["jobs"][0]["images_only"] = ["a"]
+    f.write_text(yaml.safe_dump(spec))
+    _, jobs = load_jobs(f, {})
+    assert [i.id for i in jobs[0].images] == ["a"]

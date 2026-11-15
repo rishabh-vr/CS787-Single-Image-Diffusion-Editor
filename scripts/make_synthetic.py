@@ -22,14 +22,20 @@ from sidx.data.synthetic import design, render, spec_dict  # noqa: E402
 
 
 def main() -> None:
-    out_dir = ROOT / "data" / "synthetic" / "setB"
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--size", type=int, default=128, help="image side in px: 128 = Set B, 64 = laptop pilot Set B64")
+    size = ap.parse_args().size
+    name = "setB" if size == 128 else f"setB{size}"
+    out_dir = ROOT / "data" / "synthetic" / name
     out_dir.mkdir(parents=True, exist_ok=True)
-    manifest = ROOT / "data" / "manifests" / "synthetic_setB.csv"
+    manifest = ROOT / "data" / "manifests" / f"synthetic_{name}.csv"
     rows = []
-    for image_id, factor, spec in design():
+    for image_id, factor, spec in design(size):
         p = out_dir / f"{image_id}.png"
         render(spec).save(p)
-        row = {"id": image_id, "set": "synthetic_setB", "category": "synthetic", "factor": factor,
+        row = {"id": image_id, "set": f"synthetic_{name}", "category": "synthetic", "factor": factor,
                "path": Path(os.path.relpath(p, manifest.parent)).as_posix(),
                "height": spec.size, "width": spec.size,
                "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),

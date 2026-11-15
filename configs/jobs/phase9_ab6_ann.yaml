@@ -1,0 +1,44 @@
+# Phase 9, AB6 (optional): exact vs approximate nearest neighbours (needs faiss on the Colab GPU; notebook 00 reports whether it imports).
+# Compare with the baseline job of phase9_ablations.yaml. If faiss does not import, setup errors are logged and nothing else is affected.
+experiment: phase9_ab6_ann
+jobs:
+- name: ab6_ann_k5_np2
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.type=ann
+    - image_denoiser.patch_denoiser.k=5
+- name: ab6_ann_k20_np2
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.type=ann
+    - image_denoiser.patch_denoiser.k=20
+- name: ab6_ann_k5_np8
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.type=ann
+    - image_denoiser.patch_denoiser.k=5
+    - image_denoiser.patch_denoiser.nprobe=8

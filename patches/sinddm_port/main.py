@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--train_lr", help='starting lr.', default=1e-3, type=float)
     parser.add_argument("--sched_k_milestones", nargs="+", help='lr scheduler steps x 1000.',
                         default=[20, 40, 70, 80, 90, 110], type=int)
-    parser.add_argument("--load_milestone", help='load specific milestone.', default=0, type=int)
+    parser.add_argument("--load_milestone", help='load specific milestone (an integer, or [port] "last" = model-last.pt).', default='0')
     # sampling params
     parser.add_argument("--sample_batch_size", help='batch size during sampling.', default=16, type=int)
     parser.add_argument("--scale_mul", help='image size retargeting modifier.', nargs="+", default=[1, 1], type=float)
@@ -166,8 +166,10 @@ def main():
 
         )
 
-    if args.load_milestone > 0:
-        ScaleTrainer.load(milestone=args.load_milestone)
+    # [port] --load_milestone may be an integer or 'last'
+    load_milestone = int(args.load_milestone) if str(args.load_milestone).isdigit() else args.load_milestone
+    if load_milestone not in (0, ''):
+        ScaleTrainer.load(milestone=load_milestone)
     if args.mode == 'train':
         # [port] resumable, time-budgeted training for free Colab sessions
         last_ckpt = os.path.join(results_folder, 'model-last.pt')

@@ -1,0 +1,26 @@
+# Phase 8: the paper's method on EXACTLY the images the baselines are trained on, so all methods see identical inputs.
+#   * sinddm_ood3: the 3 OOD images at 128 px (SinDDM trains on these; notebook 11)
+#   * lora8:       the 8 images LoRA is trained on (notebook 12): 3 natural + 5 OOD, at their native <=256 px size
+# 30 samples each (seeds 10..39), fp32, official code on the free Colab T4. Resumable.
+#   python scripts/run_queue.py configs/jobs/phase8_ours_on_baseline_images.yaml --out-root /content/drive/MyDrive/CS787/outputs \
+#       --budget-min 100 --var SID_ROOT=/content/efficient-SID-code
+experiment: phase8_ours
+
+jobs:
+  - name: ours_sinddm_ood3_128px
+    method: sid_official
+    images_manifest: data/manifests/sinddm_ood3.csv
+    seeds: {start: 10, count: 30}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32]
+
+  - name: ours_lora8_ood5
+    method: sid_official
+    images_manifest: data/manifests/lora8.csv
+    images_exclude: [forest, night_sky, pyramids]     # the 3 natural ones are covered by phase4_reproduction (50 seeds)
+    seeds: {start: 10, count: 30}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.query_chunks=4]

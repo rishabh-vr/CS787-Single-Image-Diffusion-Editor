@@ -1,0 +1,18 @@
+# Phase 7 laptop pilot: our core on Set B64 (24 synthetic 64-px drawings), CPU, ~55 min.
+# A small, fast version of the failure-isolation sweep (plan F1) used to validate the whole
+# generate -> evaluate -> analyse pipeline and to get PRELIMINARY factor effects. It is NOT the
+# final experiment (that is phase7_setB_gpu.yaml, 128 px on the Colab T4).
+#
+#   python scripts/run_queue.py configs/jobs/phase7_pilot_setB64_cpu.yaml --out-root outputs/pilot
+#
+# 3 pyramid scales (64 -> 32 -> 16 px; a 4th would be below the 15-px patch), paper preset otherwise.
+experiment: phase7_pilot
+
+defaults:
+  images_manifest: data/manifests/synthetic_setB64.csv
+
+jobs:
+  - name: core_paper_3scales_cpu
+    method: sid_core
+    seeds: {start: 10, count: 8}
+    params: {device: cpu, num_scales: 3, backend: chunked, query_chunks: 2}

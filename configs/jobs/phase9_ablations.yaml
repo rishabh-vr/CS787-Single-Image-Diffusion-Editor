@@ -1,0 +1,208 @@
+# Phase 9: ablations AB1-AB4 and AB7 on the 6-image ablation subset (plan §10), 10 samples each, free Colab T4, fp32.
+#   2 floor plans (fp_layout, fp_house2), 2 patterns (pat_p4, pat_cmm), 1 circuit (ckt_24aa), 1 natural (balloons);
+#   data/manifests/ablation_subset.csv (written by scripts/make_ablation_subset.py).
+# 15 jobs x 6 images x 10 samples = 900 samples, ~2-3 T4-h [estimate]. Resumable; rerun until `--dry-run` is empty.
+#   python scripts/run_queue.py configs/jobs/phase9_ablations.yaml --out-root /content/drive/MyDrive/CS787/outputs #       --budget-min 100 --var SID_ROOT=/content/efficient-SID-code
+# Notes:
+#  - The baseline job re-runs the main setting on the SAME seeds so every ablation has a matched control
+#    (the Phase 7 outputs are 256 px natural-size runs; the baseline here shares the exact preset).
+#  - ab4_scales5: a 5th scale is < 15 px for images with a short side < 240 px (balloons, fp_layout...). Those
+#    setups fail and are logged in errors.jsonl: that IS the result (the method cannot use more scales there).
+#  - ab5 (FLUX latent) needs a Hugging Face login: configs/jobs/phase9_ab5_latent.yaml. ab6 (ANN): phase9_ab6_ann.yaml.
+experiment: phase9_ablations
+jobs:
+- name: baseline_p15_rho0.2_T10_eta0
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+- name: ab1_patch7
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.patch_size=7
+- name: ab1_patch11
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.patch_size=11
+- name: ab1_patch23
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.patch_size=23
+- name: ab2_rho0.1
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.fold_rho=0.1
+- name: ab2_rho1.0
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.fold_rho=1.0
+- name: ab2_rhoinf
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.fold_rho=.inf
+- name: ab3_T10_eta1
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - scheduler.eta=1.0
+- name: ab3_T40_eta0
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - scheduler.num_steps=40
+- name: ab3_T40_eta1
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - scheduler.num_steps=40
+    - scheduler.eta=1.0
+- name: ab4_scales2
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - pyramid.num_scales=2
+- name: ab4_scales3
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - pyramid.num_scales=3
+- name: ab4_scales5
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - pyramid.num_scales=5
+- name: ab7_stride2
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.dataset_stride=2
+- name: ab7_stride4
+  method: sid_official
+  seeds:
+    start: 10
+    count: 10
+  images_manifest: data/manifests/ablation_subset.csv
+  params:
+    config: configs/uncond/paper_sinddm15.yaml
+    overrides:
+    - precision.dtype=float32
+    - image_denoiser.patch_denoiser.bottleneck_dtype=float32
+    - image_denoiser.patch_denoiser.query_chunks=4
+    - image_denoiser.dataset_stride=4

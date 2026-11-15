@@ -1,0 +1,41 @@
+# Phase 7: the paper's method on out-of-distribution images (free Colab T4, fp32). Resumable.
+#
+#   python scripts/run_queue.py configs/jobs/phase7_ood_gpu.yaml --out-root /content/drive/MyDrive/CS787/outputs \
+#       --budget-min 100 --var SID_ROOT=/content/efficient-SID-code     (or: notebooks/10_run_queue.ipynb, JOB_FILE = this file)
+#
+# Settings are the paper preset with the pyramid depth FIXED (notes D11: the default would give 5 scales
+# at 256 px). Rough cost [estimate]: Set B 128 px ~2 s/sample -> 24 x 20 = 480 samples ~ 20 min;
+# Set A 256 px ~15 s/sample -> 23 x 30 = 690 samples ~ 3 h (spread over sessions).
+experiment: phase7_ood
+
+jobs:
+  # Set B: 24 synthetic 128-px drawings, one factor varied at a time (plan F1). 128 -> 64 -> 32 -> 16 px.
+  - name: setB_paper_fp32
+    method: sid_official
+    images_manifest: data/manifests/synthetic_setB.csv
+    seeds: {start: 10, count: 20}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32]
+
+  # Set A: 24 real images, <= 256 px. 4 scales; the dense kernel at 256 x 256 needs 4 query chunks (13.7 GB).
+  - name: setA_paper_fp32
+    method: sid_official
+    images_manifest: data/manifests/ood_setA.csv
+    images_exclude: [ckt_bleed]
+    seeds: {start: 10, count: 30}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  image_denoiser.patch_denoiser.query_chunks=4]
+
+  # ckt_bleed is only 110 px high: a 4th scale would be 14 px, below the 15-px patch -> 3 scales.
+  - name: setA_bleed_3scales_fp32
+    method: sid_official
+    images_manifest: data/manifests/ood_setA.csv
+    images_only: [ckt_bleed]
+    seeds: {start: 10, count: 30}
+    params:
+      config: configs/uncond/paper_sinddm15.yaml
+      overrides: [precision.dtype=float32, image_denoiser.patch_denoiser.bottleneck_dtype=float32,
+                  pyramid.num_scales=3]

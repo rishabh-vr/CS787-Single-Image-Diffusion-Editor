@@ -42,6 +42,37 @@ In Colab: **File → Open notebook → GitHub tab** (or upload the file), then *
 
 Notebooks are generated from `scripts/make_notebooks.py`. Edit that script, then regenerate with `python scripts/make_notebooks.py`.
 
+## 2b. Session plan for Phases 4–9 (the GPU experiments)
+
+Every experiment is resumable: rerun the same notebook in later sessions until its "pending" list is empty.
+Times are **estimates** until notebook 00 / the first session of notebook 10 give real T4 numbers.
+
+| Order | Notebook | Setting | What it produces | T4 time [est.] |
+|---|---|---|---|---|
+| 1 | `00_setup_smoke` | (once) | official code works on the T4, timings, D2/D3 precision questions, faiss | 0.5 h |
+| 2 | `10_run_queue` | `JOB_FILE = configs/jobs/phase4_reproduction.yaml` | Track 1: Table-1 main row (15×50), T=40/η=1, ANN k=5, our core on the GPU | ~5 h |
+| 3 | `10_run_queue` | `JOB_FILE = configs/jobs/phase7_ood_gpu.yaml` | Track 2: Set B (24 × 20 samples, 128 px) and Set A (24 × 30 samples, 256 px) | ~3.5 h |
+| 4 | `10_run_queue` | `JOB_FILE = configs/jobs/phase9_ablations.yaml` | AB1–AB4, AB7 (6 images × 10 samples × 15 settings) | ~4 h |
+| 5 | `10_run_queue` | `JOB_FILE = configs/jobs/phase8_ours_on_baseline_images.yaml` | our method on the exact images the baselines train on | ~1 h |
+| 6 | `11_sinddm_train` | (several sessions) | SinDDM on 3 OOD images, 20k steps each, sampled at 5k/10k/20k + the 3 pretrained models | ~12 h |
+| 7 | `12_lora_train` | (2 sessions) | DreamBooth-LoRA on 8 images + 30 samples each | ~3 h |
+| 8 | `10_run_queue` | `JOB_FILE = configs/jobs/phase9_ab6_ann.yaml` *(optional, needs faiss)* | AB6 exact vs ANN | ~1 h |
+| after each | `13_evaluate` (**CPU runtime**) | — | `eval/<experiment>/<job>/per_sample.csv, per_image.csv` on Drive | 0 GPU |
+
+Then, on the laptop (or in a Colab CPU runtime), with the `eval/` folder downloaded or Drive-mounted:
+
+```bash
+python scripts/analyze.py table1    --eval-root <eval>     # Track 1 vs the paper's Table 1
+python scripts/analyze.py ood       --eval-root <eval>     # categories, factors, descriptor correlations
+python scripts/analyze.py ablations --eval-root <eval>
+python scripts/analyze.py baselines --eval-root <eval>
+python scripts/make_figures.py grids --exp-dir <outputs>/phase7_ood --eval-root <eval> --manifest data/manifests/ood_setA.csv --manifest data/manifests/synthetic_setB.csv --out reports/figures/ood
+python scripts/build_results_md.py                         # stitches reports/tables + figures into docs/results.md
+```
+
+Free-tier rules of thumb: ≤ 100 min per session, close the runtime afterwards, ~5 T4-h per week per account.
+Run `13_evaluate` on a CPU runtime; `scripts/failure_isolation.py` (F2–F5) runs on the laptop CPU.
+
 ## 3. Running experiments: the job runner
 
 Every experiment is a YAML **job file** in `configs/jobs/`, run through `scripts/run_queue.py`:

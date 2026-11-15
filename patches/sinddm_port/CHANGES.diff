@@ -1,5 +1,5 @@
 diff --git a/SinDDM/functions.py b/SinDDM/functions.py
-index d924ff3..a682e10 100644
+index d924ff3..071b97b 100644
 --- a/SinDDM/functions.py
 +++ b/SinDDM/functions.py
 @@ -25,7 +25,7 @@ def dilate_mask(mask, mode):
@@ -12,7 +12,7 @@ index d924ff3..a682e10 100644
      mask = mask[:, :, None, None]
      mask = mask.transpose(3, 2, 0, 1)
 diff --git a/SinDDM/trainer.py b/SinDDM/trainer.py
-index 0a6b2ee..d63e98d 100644
+index 0a6b2ee..8e3c678 100644
 --- a/SinDDM/trainer.py
 +++ b/SinDDM/trainer.py
 @@ -30,6 +30,17 @@ except:
@@ -158,7 +158,7 @@ index 0a6b2ee..d63e98d 100644
      def sample_scales(self, scale_mul=None, batch_size=16, custom_sample=False, custom_image_size_idxs=None,
                        custom_scales=None, image_name='', start_noise= True, custom_t_list=None, desc=None, save_unbatched=True):
 diff --git a/main.py b/main.py
-index f6c9b6e..5848515 100644
+index f6c9b6e..034ca5f 100644
 --- a/main.py
 +++ b/main.py
 @@ -6,7 +6,7 @@ import torchvision
@@ -170,7 +170,15 @@ index f6c9b6e..5848515 100644
  
  def main():
  
-@@ -51,6 +51,21 @@ def main():
+@@ -44,13 +44,28 @@ def main():
+     parser.add_argument("--train_lr", help='starting lr.', default=1e-3, type=float)
+     parser.add_argument("--sched_k_milestones", nargs="+", help='lr scheduler steps x 1000.',
+                         default=[20, 40, 70, 80, 90, 110], type=int)
+-    parser.add_argument("--load_milestone", help='load specific milestone.', default=0, type=int)
++    parser.add_argument("--load_milestone", help='load specific milestone (an integer, or [port] "last" = model-last.pt).', default='0')
+     # sampling params
+     parser.add_argument("--sample_batch_size", help='batch size during sampling.', default=16, type=int)
+     parser.add_argument("--scale_mul", help='image size retargeting modifier.', nargs="+", default=[1, 1], type=float)
      parser.add_argument("--sample_t_list", nargs="+", help='Custom list of timesteps corresponding to each scale (except scale 0).', type=int)
      # device num
      parser.add_argument("--device_num", help='use specific cuda device.', default=0, type=int)
@@ -224,9 +232,16 @@ index f6c9b6e..5848515 100644
      scale_mul = (args.scale_mul[0], args.scale_mul[1])
      sched_milestones = [val * 1000 for val in args.sched_k_milestones]
      results_folder = args.results_folder + '/' + args.scope
-@@ -131,7 +169,24 @@ def main():
-     if args.load_milestone > 0:
-         ScaleTrainer.load(milestone=args.load_milestone)
+@@ -128,10 +166,29 @@ def main():
+ 
+         )
+ 
+-    if args.load_milestone > 0:
+-        ScaleTrainer.load(milestone=args.load_milestone)
++    # [port] --load_milestone may be an integer or 'last'
++    load_milestone = int(args.load_milestone) if str(args.load_milestone).isdigit() else args.load_milestone
++    if load_milestone not in (0, ''):
++        ScaleTrainer.load(milestone=load_milestone)
      if args.mode == 'train':
 -        ScaleTrainer.train()
 +        # [port] resumable, time-budgeted training for free Colab sessions
@@ -250,7 +265,7 @@ index f6c9b6e..5848515 100644
          # Sample after training is complete
          ScaleTrainer.sample_scales(scale_mul=(1, 1),    # H,W
                                     custom_sample=True,
-@@ -156,6 +211,7 @@ def main():
+@@ -156,6 +213,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}
@@ -258,7 +273,7 @@ index f6c9b6e..5848515 100644
          t2l_clip_extractor = ClipExtractor(clip_cfg)
          clip_custom_t_list = sample_t_list
  
-@@ -192,6 +248,7 @@ def main():
+@@ -192,6 +250,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}
@@ -266,7 +281,7 @@ index f6c9b6e..5848515 100644
          t2l_clip_extractor = ClipExtractor(clip_cfg)
          clip_custom_t_list = sample_t_list
  
-@@ -231,6 +288,7 @@ def main():
+@@ -231,6 +290,7 @@ def main():
          clip_cfg = {"clip_model_name": "ViT-B/32",
                      "clip_affine_transform_fill": True,
                      "n_aug": 16}

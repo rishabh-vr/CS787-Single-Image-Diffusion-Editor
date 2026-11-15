@@ -11,6 +11,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import nbformat as nbf
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -549,6 +551,11 @@ print(subprocess.run(base + ["--dry-run"], cwd=PROJECT, capture_output=True, tex
     ]
 
 
+import nb_phase8  # noqa: E402  (sibling module: builders for notebooks 11-13)
+
+nb_sinddm_train, nb_lora_train, nb_evaluate = nb_phase8.build(md, code, SETTINGS, GPU_CHECK, MOUNT_AND_CODE, SINDDM_CLONE, FREEZE)
+
+
 def main() -> None:
     # Optional filter: `python scripts/make_notebooks.py 07` regenerates only matching notebooks,
     # so notebooks saved from Colab with outputs (e.g. 05) are not overwritten.
@@ -561,10 +568,15 @@ def main() -> None:
                          ("05_sinddm_port.ipynb", nb_sinddm()),
                          ("06_lora_smoke.ipynb", nb_lora()),
                          ("07_tpu_sinddm.ipynb", nb_tpu()),
-                         ("10_run_queue.ipynb", nb_queue())):
+                         ("10_run_queue.ipynb", nb_queue()),
+                         ("11_sinddm_train.ipynb", nb_sinddm_train()),
+                         ("12_lora_train.ipynb", nb_lora_train()),
+                         ("13_evaluate.ipynb", nb_evaluate())):
         if only and not any(fname.startswith(p) for p in only):
             continue
         nb_meta = dict(meta)
+        if fname.startswith("13"):
+            nb_meta = {**meta, "accelerator": "None", "colab": {"provenance": []}}
         if fname.startswith("07"):
             nb_meta = {**meta, "accelerator": "TPU", "colab": {"provenance": [], "gpuType": "V5E1"}}
         nb = nbf.v4.new_notebook(cells=cells, metadata=nb_meta)

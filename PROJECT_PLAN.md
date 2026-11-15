@@ -763,7 +763,13 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** hidden implementation details (blur, padding at borders, bf16 vs fp32 differences).
 - **Done when:** the equivalence test passes, or every remaining difference is explained and documented.
 
-#### Phase 5 — Validation against the original paper
+#### Phase 5 — Validation against the original paper — 🟡 CODE DONE, RESULTS NEED THE COLAB RUNS
+
+> **Done (laptop, tested):** `src/sidx/metrics/` (SIFID with our own Fréchet distance, because pytorch-fid's `sqrtm(disp=…)` breaks on current SciPy; pixel/LPIPS diversity; near-duplicate rate (Table S1); NIQE/NIMA/MUSIQ via pyiqa; patch SWD, patch precision/recall; block-copy ratio; structure suite), `scripts/evaluate.py` (runner output → per-sample/per-image CSV), `src/sidx/analysis.py` + `scripts/analyze.py table1` (our rows next to the paper's Table 1).
+> **Done:** full-size equivalence of our core with the official code at the paper preset (186×248, CPU, fp32, 2 seeds): mean difference 0.002–0.004 grey levels, 0.008 % of pixels differ by > 1 level, worst pixel 2.3 levels (`reports/equivalence/`).
+> **Sanity found:** SIFID on one image varies a lot between samples (1.9 and 15.1 for two samples of *balloons*) and its absolute scale differs from the paper's. So, as planned in §8, Track 1 is judged on trends and on calibration against the 3 SinDDM pretrained models (the `sinddm_pretrained_full` job in notebook 11), not on absolute values.
+> **Pending (Colab):** `phase4_reproduction.yaml` via notebook 10 (≈ 5 T4-h), then notebook 13 + `analyze.py table1`.
+> **Not done:** R7 (inversion PSNR), R9 (retarget/tile/symmetric qualitative) and the runtime-vs-resolution table need the official application scripts on the T4 and are not yet scripted. R4/R5 (Fig. 8, Table 3 subsets) are covered by the Phase 9 ablation jobs on the 6-image subset rather than by a separate 5-image reproduction subset.
 - **Objective:** show quantitatively and qualitatively that our setup reproduces the paper (targets R1–R9 in §8).
 - **Tasks:**
   1. Implement the paper's metrics: SIFID (SinGAN code), NIQE/NIMA/MUSIQ (pyiqa), pixel diversity and LPIPS diversity (SinDDM definitions), near-duplicate rate (Table S1 protocol), and wall-clock timing with `cuda.synchronize`.
@@ -786,7 +792,13 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 
 ### Stage III — Extension Experiments
 
-#### Phase 6 — OOD dataset preparation & structural metric suite
+#### Phase 6 — OOD dataset preparation & structural metric suite — ✅ DONE
+
+> **Set A (real, 24 images)** `data/ood/setA/`, manifest `data/manifests/ood_setA.csv`: 8 floor plans, 8 geometric patterns, 5 circuit schematics, 3 text-heavy diagrams, picked by hand from Wikimedia Commons candidates (`scripts/prepare_ood.py`; selection in `configs/data/ood_setA.yaml`). Every file is public domain, CC0, CC BY or CC BY-SA; author, licence and source URL are in the manifest, and the build step refuses any other licence.
+> **Deviation from §4.2:** Commons instead of FloorPlanCAD / DTD / AI2D: one API with per-file licence metadata, SVGs rasterised at a controlled width, a few MB instead of a 600 MB archive, and the FloorPlanCAD site is offline. The image *types* are the same, but the HABS floor plans are scanned drawings (noisier than CAD line art) and the patterns are coloured tilings (not binary lattices), which matters for how the ghosting and periodicity metrics read.
+> **Set B (synthetic, 24 images)** `data/synthetic/setB/` (128 px) and `setB64/` (64 px, laptop pilot): axis-aligned lines, one factor at a time (thickness 1/2/4/8, density 2/5/10, length long/short, periodicity perfect/jitter/random, junctions X/T/none, text none/sparse), 2 layout seeds. Ground truth: allowed orientations 0° and 90°.
+> **Structural metrics** (`src/sidx/metrics/structure.py`) are verified by known-answer tests: identity gives neutral values; fragmentation, ghosting and tilted lines are detected.
+> **Note:** `ckt_bleed` is only 110 px high, so it runs with 3 pyramid scales (a 4th would be 14 px, below the patch size).
 - **Objective:** a curated, licence-documented OOD dataset, plus metrics that measure structural correctness without penalizing legitimate variation.
 - **Tasks:**
   1. **6a — Real OOD set (Set A, ~24 images):**
@@ -806,7 +818,11 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** licences for real images; SVG rendering quirks; metrics that don't discriminate.
 - **Done when:** the manifests are complete with licences, and every metric passes its sanity test (or is dropped).
 
-#### Phase 7 — OOD experimentation (training-free method)
+#### Phase 7 — OOD experimentation (training-free method) — 🟡 JOBS READY; LAPTOP PILOT RUN; GPU RUNS PENDING
+
+> **GPU runs (Colab):** `configs/jobs/phase7_ood_gpu.yaml`: Set B 24 × 20 samples at 128 px, Set A 24 × 30 samples at 256 px (4 query chunks), fp32, paper preset, depth fixed (notes D11). Via notebook 10.
+> **Laptop pilot (CPU, preliminary):** our core on Set B64, 64 px, 3 scales, 8 samples per image: `configs/jobs/phase7_pilot_setB64_cpu.yaml` (≈ 1 h). Used to validate generate → evaluate → analyse end to end and to get an early read of the factor effects.
+> **Not done:** retargeting and tileable generation on OOD images (tasks ii/iii of §8) need the official application scripts on the T4; the commands are in the official README (`sample_retarget.py`, `sample_tileable.py`) and are not yet scripted.
 - **Objective:** Track-2 main results — how the method behaves on structured imagery, with default (paper) settings.
 - **Tasks:**
   1. Unconditional generation, paper preset with `num_scales: 4` fixed, fp32:
@@ -828,7 +844,12 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 > **Milestone M2 — OOD review (end of week 5).**
 > Choose the 2–3 failure modes to study in depth in Phase 9. Decide whether the optional intervention (F6) is worth doing. If OOD performance is uniformly good, shift the emphasis to harder categories and to the baseline comparison. Record the decision in a short memo.
 
-#### Phase 8 — Training-based baseline implementation
+#### Phase 8 — Training-based baseline implementation — 🟡 NOTEBOOKS + JOBS READY; GPU RUNS PENDING
+
+> **SinDDM (primary):** `notebooks/11_sinddm_train.ipynb`: 3 OOD images at 128 px (`data/manifests/sinddm_ood3.csv`: synthetic base grid, floor plan, p4 pattern), **20 000 steps** each (LR milestones compressed in proportion; ≈ 4 T4-h per image at the 712 s / 1 000 steps measured in notebook 05), sampled at 5k/10k/20k steps = a quality-vs-training-time curve, plus the 3 official pretrained models as the converged reference. Samples go through `scripts/sinddm_collect.py` into the standard layout. The free TPU is not used (slower, §5.2b).
+> **DreamBooth-LoRA (secondary):** `notebooks/12_lora_train.ipynb`: SD 1.5, rank 8, lr 1e-4, 600 steps, no prior preservation, 8 images (`lora8.csv`: forest, night_sky, pyramids + 2 floor plans, 2 patterns, 1 circuit), 30 samples each, resized back to the input size. **Deviation:** the 2-image dev set for tuning steps/lr is dropped on the free tier (untuned defaults of the diffusers example).
+> **Same inputs for our method:** `phase8_ours_on_baseline_images.yaml` (90 + 150 samples).
+> **Verified locally:** the SinDDM port trains and checkpoints on CPU (milestone files written); `--load_milestone last` was added for sampling.
 - **Objective:** produce SinDDM (primary) and DreamBooth-LoRA (secondary) outputs under a fair protocol (§9), **within the free-Colab budget**.
 - **Free-tier scope (decided 2026-11-13):**
   - **SinDDM:** natural images = the **3 provided pretrained models** (sampling only); OOD = **3 images** (1 floor plan, 1 pattern, 1 circuit schematic), trained at a **reduced budget**.
@@ -860,7 +881,10 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
   - the LoRA resolution mismatch.
 - **Done when:** the selected images have trained models and 30 samples per method, and the fairness checklist in §9 is satisfied, including the reduced-budget disclosure.
 
-#### Phase 9 — Controlled ablation studies & failure isolation
+#### Phase 9 — Controlled ablation studies & failure isolation — 🟡 JOBS READY; F2–F5 SCRIPTED FOR THE LAPTOP
+
+> **Ablations AB1–AB4, AB7** (patch size, ρ, T×η, number of scales, stride) on the 6-image subset (`ablation_subset.csv`: 2 floor plans, 2 patterns, 1 circuit, balloons), 10 samples each, with a matched baseline job on the same seeds: `configs/jobs/phase9_ablations.yaml` (15 jobs, 900 samples, ≈ 4 T4-h). AB6 (ANN): `phase9_ab6_ann.yaml` (optional, needs faiss). **AB5 (FLUX latent) is not set up** (needs a Hugging Face login and a gated model; optional in the plan).
+> **Failure isolation:** `scripts/failure_isolation.py` runs F2 (are rare patches dropped?), F3 (per-scale structure), F4 (blend vs no blend) and F5 (background fraction) with our core on the laptop at 64 px. This is why our own implementation matters: the official code cannot log winning patches or per-scale results. F1 = the Set B factor sweep (Phase 7). F6 (an intervention) is not attempted.
 - **Objective:** find out *why* the method succeeds or fails, using the ablations AB1–AB7 and the isolation experiments F1–F5 (§10).
 - **Tasks:**
   1. **9a — Ablations** on a **6-image** ablation subset (2 floor plans, 2 patterns, 1 circuit schematic, 1 natural), 10 samples each: patch size, ρ, T×η, number of scales, stride.
@@ -889,7 +913,9 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 
 ### Stage IV — Analysis & Reporting
 
-#### Phase 10 — Quantitative & qualitative evaluation
+#### Phase 10 — Quantitative & qualitative evaluation — 🟡 TOOLING READY
+
+> `scripts/analyze.py` (table1 / ood / ablations / baselines / pilot): per-image means, bootstrap 95 % CIs **over images**, paired deltas against a matched baseline, Spearman correlations of metrics with image descriptors, one-factor-at-a-time effects. `scripts/make_figures.py` + `src/sidx/viz.py`: fixed-seed grids (first six seeds, no cherry-picking) plus best/worst by the composite structural deviation. `scripts/build_results_md.py` assembles `docs/results.md`; preliminary and final results are labelled separately. **Not done:** the 3-rater blind human study (needs people).
 - **Objective:** consolidate all the results into defensible tables, figures and comparisons.
 - **Tasks:**
   1. **Aggregate** all runs (`eval/aggregate.py`):
@@ -912,7 +938,9 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** rater availability; multiple-comparison issues (report effect sizes, not just p-values).
 - **Done when:** every claim planned for the report is backed by a table or figure with uncertainty.
 
-#### Phase 11 — Failure analysis
+#### Phase 11 — Failure analysis — 🟡 TOOLING READY
+
+> The F2–F5 scripts (Phase 9) and the structural metrics give the numbers; the failure taxonomy (fragmentation, ghosting, rare-symbol dropout, lattice dislocation, glyph soup, layout collapse, copying) is assigned from the grids once the GPU runs exist.
 - **Objective:** turn the observations into an explained failure taxonomy — what fails, when, and why.
 - **Tasks:**
   1. Finalize the taxonomy, with ≥ 2 annotated examples and a frequency per category for each failure type: fragmentation, ghosting, rare-symbol dropout, lattice dislocation, glyph soup, layout collapse, copy-paste memorization.
@@ -925,7 +953,9 @@ The project is split into **12 phases in 4 stages**, with a review **milestone (
 - **Difficulties:** separating causation from correlation in real images (lean on the synthetic results).
 - **Done when:** each failure type has examples, frequency and a supported (or explicitly unexplained) cause.
 
-#### Phase 12 — Documentation & research presentation
+#### Phase 12 — Documentation & research presentation — 🟡 IN PROGRESS
+
+> README, `docs/technical_notes.md` (D1–D15), `docs/colab_workflow.md` (session plan §2b), the progress report in `report/`, and this plan are up to date. The final report and slides need the results of the GPU runs.
 - **Objective:** a reproducible repository, a final report and a presentation.
 - **Tasks:**
   1. README with the exact commands to reproduce each table (one command for the Table-1 replica).

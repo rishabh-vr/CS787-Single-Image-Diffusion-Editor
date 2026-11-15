@@ -1,0 +1,4 @@
+id,set,category,path,height,width,sha256,source,licence
+sd_b0,sinddm_ood3,synthetic,../sinddm/sd_b0.png,128,128,f4195f53a8fed75b1b078e4178a16db304caa0db87b2958c6d40f69563b75913,Set B base grid (128 px),see source manifests
+sd_fp_house2,sinddm_ood3,floorplan,../sinddm/sd_fp_house2.png,128,124,87765420f41938bbd963098986bc6bb507f17c7c77384176b22817bc60cb4b1c,"Set A floor plan, long side -> 128",see source manifests
+sd_pat_p4,sinddm_ood3,pattern,../sinddm/sd_pat_p4.png,128,128,3e6c66d2791a0e7b425a97e94ab32a05364cd2898a2193ef2a6795c0120813b1,"Set A p4 wallpaper pattern, 256 -> 128",see source manifests

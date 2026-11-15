@@ -115,6 +115,11 @@ def load_jobs(job_file: Path, variables: Dict[str, str]) -> tuple[str, List[JobS
         images: List[ImageSpec] = [ImageSpec(id=i["id"], path=i["path"]) for i in merged.get("images", [])]
         if merged.get("images_manifest"):
             images += _read_manifest(Path(merged["images_manifest"]))
+        only, exclude = merged.get("images_only"), merged.get("images_exclude")
+        if only:
+            images = [i for i in images if i.id in set(only)]
+        if exclude:
+            images = [i for i in images if i.id not in set(exclude)]
         if not images:
             raise ValueError(f"job {merged['name']!r} has no images")
         params = dict(merged.get("params", {}) or {})
