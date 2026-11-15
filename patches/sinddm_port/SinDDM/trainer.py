@@ -238,10 +238,28 @@ class MultiscaleTrainer(object):
         s_weights = torch.tensor(self.model.num_timesteps_trained, device=self.device, dtype=torch.float)
         s_weights_host = [float(w) for w in self.model.num_timesteps_trained]
         scales = list(range(len(s_weights_host)))
+        # [port] progress file for external monitors (Kaggle/Colab progress bars): step, total, last loss
+        import json as _json
+        t_last_prog = 0.0
+        step0 = self.step
+        last_loss = None
+
+        def _write_progress(now):
+            p = self.results_folder / 'progress.json'
+            tmp = self.results_folder / 'progress.json.tmp'
+            rate = (self.step - step0) / max(now - t_start, 1e-6)
+            tmp.write_text(_json.dumps({'step': self.step, 'total': self.train_num_steps, 'loss': last_loss,
+                                        'steps_per_s': round(rate, 3), 'time': now}))
+            os.replace(tmp, p)
+
         while self.step < self.train_num_steps:
             now = _time.time()
+            if now - t_last_prog >= 15:
+                _write_progress(now)
+                t_last_prog = now
             if time_budget_s is not None and now - t_start >= time_budget_s:
                 self.save('last')
+                _write_progress(now)
                 print(f'[port] time budget reached at step {self.step}; saved model-last.pt')
                 return False
             if checkpoint_every_s is not None and now - t_last_ckpt >= checkpoint_every_s:
@@ -265,7 +283,8 @@ class MultiscaleTrainer(object):
 
             if self.step % self.avg_window == 0:
                 avg = float(loss_avg) / self.avg_window  # the only host read in sync_free mode
-                print(f'step:{self.step} loss:{avg}')
+                print(f'step:{self.step} loss:{avg}', flush=True)
+                last_loss = avg
                 self.running_loss.append(avg)
                 loss_avg = 0
             self.opt.step()
@@ -287,6 +306,7 @@ class MultiscaleTrainer(object):
                 self.save(milestone)
 
         self.save('last')  # [port]
+        _write_progress(_time.time())
         print('training completed')
         return True
 

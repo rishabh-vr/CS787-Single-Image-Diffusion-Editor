@@ -91,12 +91,20 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
     """Write via a temp file + rename, so an interrupted session never leaves a half-written file."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    # per-process temp name: parallel workers (sidx.gpupool) may write the same file (e.g. job.json) at once
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     with open(tmp, "wb") as f:
         f.write(data)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, path)
+    for attempt in range(10):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:          # Windows: the target is briefly held by another writer
+            if attempt == 9:
+                raise
+            time.sleep(0.2)
 
 
 def atomic_write_json(path: Path, obj: Any) -> None:

@@ -37,6 +37,9 @@ def main() -> int:
     ap.add_argument("--max-samples", type=int, default=None, help="stop after this many new samples")
     ap.add_argument("--var", action="append", default=[], metavar="KEY=VALUE", help="placeholder value")
     ap.add_argument("--only", action="append", default=[], help="run only jobs with these names")
+    ap.add_argument("--images", action="append", default=[],
+                    help="run only these image ids (repeat, or comma-separated); used to split a job across GPUs")
+    ap.add_argument("--no-progress", action="store_true", help="one log line per sample instead of progress bars")
     ap.add_argument("--dry-run", action="store_true", help="list jobs, hashes and pending counts; run nothing")
     args = ap.parse_args()
 
@@ -51,6 +54,11 @@ def main() -> int:
     experiment, jobs = load_jobs(args.job_file, variables)
     if args.only:
         jobs = [j for j in jobs if j.name in set(args.only)]
+    wanted = {i for arg in args.images for i in arg.split(",") if i}
+    if wanted:
+        for j in jobs:
+            j.images = [im for im in j.images if im.id in wanted]
+        jobs = [j for j in jobs if j.images]
 
     if args.dry_run:
         from sidx.runner import seed_png
@@ -65,7 +73,8 @@ def main() -> int:
     if "SID_ROOT" in variables:
         repo_paths["efficient_sid"] = variables["SID_ROOT"]
     summary = run_jobs(experiment, jobs, args.out_root, budget_min=args.budget_min,
-                       max_samples=args.max_samples, repo_paths=repo_paths)
+                       max_samples=args.max_samples, repo_paths=repo_paths,
+                       progress=not args.no_progress)
     print(json.dumps(summary.__dict__, indent=2))
     return 0
 

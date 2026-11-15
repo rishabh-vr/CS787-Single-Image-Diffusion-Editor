@@ -151,11 +151,13 @@ def seed_png(image_dir: Path, seed: int) -> Path:
 
 def run_jobs(experiment: str, jobs: Iterable[JobSpec], out_root: Path, budget_min: Optional[float] = None,
              max_samples: Optional[int] = None, repo_paths: Optional[Dict[str, str]] = None,
-             safety_factor: float = 1.25, verbose: bool = True) -> RunSummary:
+             safety_factor: float = 1.25, verbose: bool = True, progress: bool = False) -> RunSummary:
     """Run every missing (job, image, seed) until done, the time budget, or ``max_samples``.
 
     The budget check happens before starting each sample: if the previous sample's duration
     (× ``safety_factor``) would overrun the budget, stop now rather than get cut off mid-write.
+
+    ``progress``: one tqdm bar per job (pending samples) instead of one log line per sample.
     """
     t0 = time.perf_counter()
     budget_s = None if budget_min is None else budget_min * 60.0
@@ -179,6 +181,11 @@ def run_jobs(experiment: str, jobs: Iterable[JobSpec], out_root: Path, budget_mi
                 "first_session_env": env,
             })
 
+        bar = None
+        if progress:
+            from tqdm.auto import tqdm
+            pending = sum(1 for im in job.images for s in job.seeds if not seed_png(job_dir / im.id, s).exists())
+            bar = tqdm(total=pending, desc=job.name, unit="sample", dynamic_ncols=True, mininterval=2)
         method = None
         for image in job.images:
             image_dir = job_dir / image.id
@@ -238,10 +245,16 @@ def run_jobs(experiment: str, jobs: Iterable[JobSpec], out_root: Path, budget_mi
                     "session": session_id, "gpu": env.get("gpu_name"), "torch": env["torch"]})
                 summary.done += 1
                 counts["done"] += 1
-                log(f"[runner] {job.name}/{image.id} seed {seed}: {timer.seconds:.2f}s"
-                    + (f", peak {timer.peak_vram_gb} GB" if timer.peak_vram_gb is not None else ""))
+                if bar is not None:
+                    bar.set_postfix_str(f"{image.id} seed {seed} {timer.seconds:.1f}s", refresh=False)
+                    bar.update(1)
+                else:
+                    log(f"[runner] {job.name}/{image.id} seed {seed}: {timer.seconds:.2f}s"
+                        + (f", peak {timer.peak_vram_gb} GB" if timer.peak_vram_gb is not None else ""))
             method.teardown()
             method = None
+        if bar is not None:
+            bar.close()
 
     summary.elapsed_s = round(time.perf_counter() - t0, 2)
     if stop:

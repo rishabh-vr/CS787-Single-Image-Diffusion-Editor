@@ -16,6 +16,7 @@ All GPU work runs on **free Google Colab**.
 | [PROJECT_PLAN.md](PROJECT_PLAN.md) | Full research plan: phases, timeline, risks |
 | [docs/technical_notes.md](docs/technical_notes.md) | Phase 1: paper analysis, code audit, paper-vs-code differences, metric definitions |
 | [docs/colab_workflow.md](docs/colab_workflow.md) | How to run everything on free Colab |
+| [docs/kaggle_workflow.md](docs/kaggle_workflow.md) | Steps 3–7 on free Kaggle (2 × T4, background runs, progress bars) |
 
 ## Layout
 

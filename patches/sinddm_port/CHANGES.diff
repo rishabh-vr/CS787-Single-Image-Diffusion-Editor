@@ -12,7 +12,7 @@ index d924ff3..071b97b 100644
      mask = mask[:, :, None, None]
      mask = mask.transpose(3, 2, 0, 1)
 diff --git a/SinDDM/trainer.py b/SinDDM/trainer.py
-index 0a6b2ee..8e3c678 100644
+index 0a6b2ee..9b2e3a0 100644
 --- a/SinDDM/trainer.py
 +++ b/SinDDM/trainer.py
 @@ -30,6 +30,17 @@ except:
@@ -53,7 +53,7 @@ index 0a6b2ee..8e3c678 100644
          plt.rcParams['figure.figsize'] = [16, 8]
  
          plt.plot(self.running_loss)
-@@ -177,33 +195,78 @@ class MultiscaleTrainer(object):
+@@ -177,33 +195,97 @@ class MultiscaleTrainer(object):
          plt.clf()
  
      def load(self, milestone):
@@ -102,10 +102,28 @@ index 0a6b2ee..8e3c678 100644
          s_weights = torch.tensor(self.model.num_timesteps_trained, device=self.device, dtype=torch.float)
 +        s_weights_host = [float(w) for w in self.model.num_timesteps_trained]
 +        scales = list(range(len(s_weights_host)))
++        # [port] progress file for external monitors (Kaggle/Colab progress bars): step, total, last loss
++        import json as _json
++        t_last_prog = 0.0
++        step0 = self.step
++        last_loss = None
++
++        def _write_progress(now):
++            p = self.results_folder / 'progress.json'
++            tmp = self.results_folder / 'progress.json.tmp'
++            rate = (self.step - step0) / max(now - t_start, 1e-6)
++            tmp.write_text(_json.dumps({'step': self.step, 'total': self.train_num_steps, 'loss': last_loss,
++                                        'steps_per_s': round(rate, 3), 'time': now}))
++            os.replace(tmp, p)
++
          while self.step < self.train_num_steps:
 +            now = _time.time()
++            if now - t_last_prog >= 15:
++                _write_progress(now)
++                t_last_prog = now
 +            if time_budget_s is not None and now - t_start >= time_budget_s:
 +                self.save('last')
++                _write_progress(now)
 +                print(f'[port] time budget reached at step {self.step}; saved model-last.pt')
 +                return False
 +            if checkpoint_every_s is not None and now - t_last_ckpt >= checkpoint_every_s:
@@ -133,12 +151,13 @@ index 0a6b2ee..8e3c678 100644
 -                print(f'step:{self.step} loss:{loss_avg/self.avg_window}')
 -                self.running_loss.append(loss_avg/self.avg_window)
 +                avg = float(loss_avg) / self.avg_window  # the only host read in sync_free mode
-+                print(f'step:{self.step} loss:{avg}')
++                print(f'step:{self.step} loss:{avg}', flush=True)
++                last_loss = avg
 +                self.running_loss.append(avg)
                  loss_avg = 0
              self.opt.step()
              self.opt.zero_grad()
-@@ -211,6 +274,8 @@ class MultiscaleTrainer(object):
+@@ -211,6 +293,8 @@ class MultiscaleTrainer(object):
              if self.step % self.update_ema_every == 0:
                  self.step_ema()
              self.scheduler.step()
@@ -147,11 +166,12 @@ index 0a6b2ee..8e3c678 100644
              self.step += 1
              if self.step % self.save_and_sample_every == 0:
                  milestone = self.step // self.save_and_sample_every
-@@ -221,7 +286,9 @@ class MultiscaleTrainer(object):
+@@ -221,7 +305,10 @@ class MultiscaleTrainer(object):
                  utils.save_image(all_images, str(self.results_folder / f'sample-{milestone}.png'), nrow=4)
                  self.save(milestone)
  
 +        self.save('last')  # [port]
++        _write_progress(_time.time())
          print('training completed')
 +        return True
  

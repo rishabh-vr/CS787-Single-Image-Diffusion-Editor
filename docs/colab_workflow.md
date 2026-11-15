@@ -44,6 +44,8 @@ Notebooks are generated from `scripts/make_notebooks.py`. Edit that script, then
 
 ## 2b. Session plan for Phases 4–9 (the GPU experiments)
 
+> **Update 2026-11-15:** step 2 (Phase 4) ran on Colab; steps 3–7 moved to Kaggle (two T4s, 12-h background sessions): see [kaggle_workflow.md](kaggle_workflow.md). The Colab notebooks 10–14 still work and produce identical outputs.
+
 Every experiment is resumable: rerun the same notebook in later sessions until its "pending" list is empty.
 Times are **estimates** until notebook 00 / the first session of notebook 10 give real T4 numbers.
 

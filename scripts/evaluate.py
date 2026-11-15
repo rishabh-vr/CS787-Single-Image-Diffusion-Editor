@@ -116,6 +116,7 @@ def main() -> None:
     ap.add_argument("--only-job", default=None, help="substring of the job folder name")
     ap.add_argument("--eval-root", default=None)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--no-progress", action="store_true", help="plain log lines instead of a progress bar")
     args = ap.parse_args()
     warnings.filterwarnings("ignore")
 
@@ -143,11 +144,23 @@ def main() -> None:
                 print(f"[eval] {job_dir.name}: up to date")
                 continue
         all_samples, all_images = [], []
-        for d in image_dirs:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        prog_file = out_dir / "progress.json"          # read by the parallel monitor (sidx.gpupool)
+
+        def _progress(n_done):
+            prog_file.write_text(json.dumps({"done": n_done, "total": len(image_dirs)}))
+
+        _progress(0)
+        it = image_dirs
+        if not args.no_progress:
+            from tqdm.auto import tqdm
+            it = tqdm(image_dirs, desc=job_dir.name.split("__")[0], unit="image", dynamic_ncols=True)
+        for n_img, d in enumerate(it):
             meta = manifest.get(d.name, {})
             ref_path = meta.get("abs_path") or job_images.get(d.name)
             if not ref_path or not Path(ref_path).exists():
                 print(f"[eval] {job_dir.name}/{d.name}: input image not found ({ref_path}); pass --manifest")
+                _progress(n_img + 1)
                 continue
             seeds_png = sorted(d.glob("seed_*.png"))[: args.max_samples]
             samples = [load_image(str(p)) for p in seeds_png]
@@ -165,7 +178,9 @@ def main() -> None:
                   **{k: meta[k] for k in ("set", "category", "factor") if k in meta}, **ir}
             all_samples += ps
             all_images.append(ir)
-            print(f"[eval] {job_dir.name}/{d.name}: {len(samples)} samples", flush=True)
+            _progress(n_img + 1)
+            if args.no_progress:
+                print(f"[eval] {job_dir.name}/{d.name}: {len(samples)} samples", flush=True)
         write_csv(out_dir / "per_sample.csv", all_samples)
         write_csv(out_dir / "per_image.csv", all_images)
         (out_dir / "stamp.json").write_text(json.dumps(stamp))
