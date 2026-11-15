@@ -1,0 +1,53 @@
+{
+  "image": "external/efficient-SID-code/datasets/uncond/sinddm15/balloons.png",
+  "image_hw": [
+    186,
+    248
+  ],
+  "config": {
+    "patch_size": 15,
+    "fold_rho": 0.2,
+    "dataset_stride": 1,
+    "query_stride": 1,
+    "num_scales": 4,
+    "relative_scale": 0.5,
+    "min_short_side": null,
+    "num_steps": 10,
+    "sigma_min": 0.0001,
+    "eta": 0.0,
+    "backend": "chunked",
+    "query_chunks": 16,
+    "blend": true,
+    "dtype": "float32"
+  },
+  "device": "cpu",
+  "env": {
+    "timestamp": "2026-11-13T23:06:50",
+    "hostname": "Rishabh",
+    "python": "3.12.1",
+    "torch": "2.11.0+cpu",
+    "cuda_available": false,
+    "cuda_version": null,
+    "matmul_precision": "highest",
+    "git_efficient-SID-code": "85381e3c6f29fc07144da854d86be07150404716"
+  },
+  "seeds": {
+    "10": {
+      "max_grey": 1.3536,
+      "p99_9_grey": 0.3572,
+      "mean_grey": 0.003714,
+      "frac_pixels_over_1_grey": 8.671522664371878e-05,
+      "seconds_ours": 1845.2,
+      "seconds_official": 800.3
+    },
+    "11": {
+      "max_grey": 2.3354,
+      "p99_9_grey": 0.288,
+      "mean_grey": 0.001811,
+      "frac_pixels_over_1_grey": 7.226268644444644e-05,
+      "seconds_ours": 637.3,
+      "seconds_official": 1787.8
+    }
+  },
+  "verdict": "equivalent up to isolated rounding flips"
+}

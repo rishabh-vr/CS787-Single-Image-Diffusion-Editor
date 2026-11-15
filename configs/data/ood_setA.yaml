@@ -1,0 +1,37 @@
+# Set A: hand-picked real out-of-distribution images (plan §4.3), from Wikimedia Commons.
+# Chosen by eye from the candidate contact sheets (scripts/prepare_ood.py candidates); only
+# public-domain / CC0 / CC BY / CC BY-SA files are accepted by the build step. The manifest
+# data/manifests/ood_setA.csv records author, licence and source page for every image
+# (CC BY / BY-SA need attribution). Images are at most 256 px on the long side (plan §4.3).
+#   mode fit   the whole picture, long side 256 px
+#   mode crop  the picture is resized to a long side of 512 px and a 256x256 window with a typical
+#              ink density is cut out (position stored in the manifest)
+images:
+  # --- floor plans (8) ---
+  - {id: fp_bolduc,    category: floorplan, mode: crop, title: "File:Bolduc House Floor Plan--Ste Genevieve MO.svg"}
+  - {id: fp_azabah,    category: floorplan, mode: crop, title: "File:Azabah Field House, Main Street, Cheshire, New Haven County, CT HABS CONN,5-CHESH,2- (sheet 2 of 9).png"}
+  - {id: fp_king_st,   category: floorplan, mode: crop, title: "File:48 and 50 King Street (Houses), New York, New York County, NY HABS NY,31-NEYO,21- (sheet 1 of 8).png"}
+  - {id: fp_aldford,   category: floorplan, mode: fit,  title: "File:Aldford House ground floor plans 1898.png"}
+  - {id: fp_apartment, category: floorplan, mode: fit,  title: "File:Apartment plan-Space Settlements A Design Study.png"}
+  - {id: fp_ricketts,  category: floorplan, mode: crop, title: "File:Clemuel Ricketts House drawing 1.png"}
+  - {id: fp_layout,    category: floorplan, mode: fit,  title: "File:EWE V1 D020 Good and bad layout planning.png"}
+  - {id: fp_house2,    category: floorplan, mode: fit,  title: "File:EWE V1 D020 House plan with two of the most important rooms.png"}
+  # --- regular geometric patterns (8) ---
+  - {id: pat_circlepack, category: pattern, mode: fit, title: "File:Circle Packing of Small Star Square Dodecagonal Tiling.png"}
+  - {id: pat_p2,         category: pattern, mode: fit, title: "File:Co-Uniform Wallpaper Example p2.svg"}
+  - {id: pat_cmm,        category: pattern, mode: fit, title: "File:Co-Uniform Wallpaper Example cmm.svg"}
+  - {id: pat_p4,         category: pattern, mode: fit, title: "File:Co-Uniform Wallpaper Example p4.svg"}
+  - {id: pat_p4g,        category: pattern, mode: fit, title: "File:Co-Uniform Wallpaper Example p4g.svg"}
+  - {id: pat_demi1,      category: pattern, mode: fit, title: "File:Demi 1 Uniform.svg"}
+  - {id: pat_demi3dual,  category: pattern, mode: fit, title: "File:Demi 3 Dual.svg"}
+  - {id: pat_pm,         category: pattern, mode: fit, title: "File:Co-Uniform Wallpaper Example pm.svg"}
+  # --- circuit schematics (5) ---
+  - {id: ckt_bleed,   category: circuit, mode: fit, title: "File:580px Bleed Resistor For Capacitor Circuit.png"}
+  - {id: ckt_24aa,    category: circuit, mode: fit, title: "File:24AA1025 wiring.svg"}
+  - {id: ckt_555,     category: circuit, mode: fit, title: "File:555 Switch Mode Power Supply Circuit Diagarm.png"}
+  - {id: ckt_mixed,   category: circuit, mode: fit, title: "File:AsociacionesMixtas.png"}
+  - {id: ckt_ampop,   category: circuit, mode: fit, title: "File:Ampop 7.png"}
+  # --- text-heavy diagrams (3): the "hard negatives" ---
+  - {id: dia_wheat,   category: diagram, mode: fit, title: "File:BreadWheatEvolution.svg"}
+  - {id: dia_cellcycle, category: diagram, mode: fit, title: "File:Boolean cell cycle of the restriction point developed by Faure et al..svg"}
+  - {id: dia_life,    category: diagram, mode: fit, title: "File:Characteristics of life.svg"}
