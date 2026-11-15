@@ -1,0 +1,54 @@
+{
+ "samples": 6,
+ "images": [
+  "b0_s0",
+  "thickness_1_s0",
+  "text_sparse_s0"
+ ],
+ "config": {
+  "patch_size": 15,
+  "fold_rho": 0.2,
+  "dataset_stride": 1,
+  "query_stride": 1,
+  "num_scales": 3,
+  "relative_scale": 0.5,
+  "min_short_side": null,
+  "num_steps": 10,
+  "sigma_min": 0.0001,
+  "eta": 0.0,
+  "backend": "chunked",
+  "query_chunks": 2,
+  "blend": true,
+  "dtype": "float32"
+ },
+ "seconds": 182,
+ "result": {
+  "drawing_64px_bg0.00": {
+   "background_fraction": 0.0,
+   "patch_recall": 0.02972651645541191,
+   "patch_precision": 0.8816884656747183,
+   "ink_ratio": 1.043488160291439,
+   "endpoint_excess": 1.019549961041695,
+   "mean_seg_len_ratio": 0.9985901244975378,
+   "grey_ratio": 1.0525660189337318
+  },
+  "drawing_48px_bg0.44": {
+   "background_fraction": 0.438,
+   "patch_recall": 0.09363852441310883,
+   "patch_precision": 0.9569956262906393,
+   "ink_ratio": 1.0140398550724636,
+   "endpoint_excess": 1.028143274853801,
+   "mean_seg_len_ratio": 1.0181478967458262,
+   "grey_ratio": 1.0176470588235293
+  },
+  "drawing_40px_bg0.61": {
+   "background_fraction": 0.609,
+   "patch_recall": 0.09363852441310883,
+   "patch_precision": 0.9569461047649384,
+   "ink_ratio": 1.09375,
+   "endpoint_excess": 0.9182768998261569,
+   "mean_seg_len_ratio": 1.1197047494951422,
+   "grey_ratio": 1.1050724637681162
+  }
+ }
+}

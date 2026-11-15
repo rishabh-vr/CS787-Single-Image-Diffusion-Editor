@@ -1,0 +1,81 @@
+{
+ "samples": 6,
+ "images": [
+  "b0_s0",
+  "thickness_1_s0",
+  "text_sparse_s0"
+ ],
+ "config": {
+  "patch_size": 15,
+  "fold_rho": 0.2,
+  "dataset_stride": 1,
+  "query_stride": 1,
+  "num_scales": 3,
+  "relative_scale": 0.5,
+  "min_short_side": null,
+  "num_steps": 10,
+  "sigma_min": 0.0001,
+  "eta": 0.0,
+  "backend": "chunked",
+  "query_chunks": 2,
+  "blend": true,
+  "dtype": "float32"
+ },
+ "seconds": 360,
+ "result": {
+  "b0_s0": {
+   "blend": {
+    "layout_corr_scale1": 0.9973461528619131,
+    "layout_corr_scale2": 0.9931915501753489,
+    "patch_swd": 0.013677773725291527,
+    "endpoint_excess": 1.019549961041695,
+    "mean_seg_len_ratio": 0.9985901244975378,
+    "grey_ratio": 1.0525660189337318
+   },
+   "no_blend": {
+    "layout_corr_scale1": -0.011235703714191914,
+    "layout_corr_scale2": 0.055590285919606686,
+    "patch_swd": 0.0857749155515598,
+    "endpoint_excess": 3.021200968724742,
+    "mean_seg_len_ratio": 1.0487065620791398,
+    "grey_ratio": 0.9053313403089188
+   }
+  },
+  "thickness_1_s0": {
+   "blend": {
+    "layout_corr_scale1": 0.9668985605239868,
+    "layout_corr_scale2": 0.9783502916495005,
+    "patch_swd": 0.012599314821677076,
+    "endpoint_excess": 1.0897945075196807,
+    "mean_seg_len_ratio": 0.9251061184404789,
+    "grey_ratio": 1.0352245862884162
+   },
+   "no_blend": {
+    "layout_corr_scale1": -0.013051015324890614,
+    "layout_corr_scale2": 0.003970804313818614,
+    "patch_swd": 0.05258922035702401,
+    "endpoint_excess": 2.961189809316925,
+    "mean_seg_len_ratio": 1.010460929242581,
+    "grey_ratio": 0.7761229314420804
+   }
+  },
+  "text_sparse_s0": {
+   "blend": {
+    "layout_corr_scale1": 0.9979292452335358,
+    "layout_corr_scale2": 0.9958336651325226,
+    "patch_swd": 0.006895350996054736,
+    "endpoint_excess": 1.0039764868603043,
+    "mean_seg_len_ratio": 1.0032144967644288,
+    "grey_ratio": 1.0232974910394266
+   },
+   "no_blend": {
+    "layout_corr_scale1": 0.019841393766303856,
+    "layout_corr_scale2": 0.04106348155376812,
+    "patch_swd": 0.08802396861008471,
+    "endpoint_excess": 1.528239915521094,
+    "mean_seg_len_ratio": 1.0408924084092284,
+    "grey_ratio": 0.9466845878136202
+   }
+  }
+ }
+}
