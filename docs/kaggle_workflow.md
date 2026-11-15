@@ -19,8 +19,8 @@ to 12 h that keep running in the background. Notebooks: `notebooks/kaggle/` (gen
   experiment: `phase7_ood: 412/1230 samples (33%) | 2.4/min | ETA 5h41m`, plus which task runs on which GPU.
   (Run interactively instead and you get live progress bars in the cell, but the session ends when you leave.)
 - The result is the version's **Output**: one file `cs787_<name>.zip` (+ `logs/`).
-- Each notebook stops starting new work after `SESSION_HOURS = 11` and zips what it has, so nothing is lost at
-  Kaggle's 12-h limit. **To continue:** *Add Input → Your Work →* the same notebook (latest version) → Save Version
+- Each notebook stops by itself at `SESSION_HOURS = 1.9` (1 h 54 min) and zips what it has, so a run never
+  goes past 2 hours and nothing finished is lost. **To continue:** *Add Input → Your Work →* the same notebook (latest version) → Save Version
   again. Finished samples are never recomputed.
 
 ## The notebooks (each finishes in < 2 h: hard stop at 1 h 54 min)
@@ -37,7 +37,8 @@ notebook runs in under 2 hours (full plan ≈ 30 GPU-hours, reduced ≈ 6). The 
 jobs (`JOB_LIMITS` in K10), so outputs and config hashes are unchanged and a later run with larger limits just adds
 the missing samples. Consequences for the report: wider confidence intervals; SinDDM is compared at a matched
 small compute budget (≈ 1 GPU-hour per image) plus its fully trained pretrained models, not at a reduced 20k-step
-schedule; T = 40 ablations rely on the Phase 4 T = 40 row only.
+schedule; the T = 40 (AB3) settings are not run (the Phase 4 T = 40 job was also not reached on Colab), so
+the T × η ablation covers only T = 10 with η = 0 and 1.
 
 ## Evaluation inputs (K13)
 Attach: the latest versions of K10, K11, K12 (*Your Work*), and the Colab Phase 4 results: in Google Drive,
