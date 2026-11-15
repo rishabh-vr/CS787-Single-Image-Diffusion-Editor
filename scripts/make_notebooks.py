@@ -553,7 +553,7 @@ print(subprocess.run(base + ["--dry-run"], cwd=PROJECT, capture_output=True, tex
 
 import nb_phase8  # noqa: E402  (sibling module: builders for notebooks 11-13)
 
-nb_sinddm_train, nb_lora_train, nb_evaluate = nb_phase8.build(md, code, SETTINGS, GPU_CHECK, MOUNT_AND_CODE, SINDDM_CLONE, FREEZE)
+nb_sinddm_train, nb_lora_train, nb_evaluate, nb_apps = nb_phase8.build(md, code, SETTINGS, GPU_CHECK, MOUNT_AND_CODE, SINDDM_CLONE, FREEZE)
 
 
 def main() -> None:
@@ -571,7 +571,8 @@ def main() -> None:
                          ("10_run_queue.ipynb", nb_queue()),
                          ("11_sinddm_train.ipynb", nb_sinddm_train()),
                          ("12_lora_train.ipynb", nb_lora_train()),
-                         ("13_evaluate.ipynb", nb_evaluate())):
+                         ("13_evaluate.ipynb", nb_evaluate()),
+                         ("14_applications.ipynb", nb_apps())):
         if only and not any(fname.startswith(p) for p in only):
             continue
         nb_meta = dict(meta)

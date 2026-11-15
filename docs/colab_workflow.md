@@ -57,6 +57,7 @@ Times are **estimates** until notebook 00 / the first session of notebook 10 giv
 | 6 | `11_sinddm_train` | (several sessions) | SinDDM on 3 OOD images, 20k steps each, sampled at 5k/10k/20k + the 3 pretrained models | ~12 h |
 | 7 | `12_lora_train` | (2 sessions) | DreamBooth-LoRA on 8 images + 30 samples each | ~3 h |
 | 8 | `10_run_queue` | `JOB_FILE = configs/jobs/phase9_ab6_ann.yaml` *(optional, needs faiss)* | AB6 exact vs ANN | ~1 h |
+| 9 | `14_applications` | (once) | qualitative retargeting (1:2, 2:1) and tileable generation on Set A images, official scripts | ~0.5 h |
 | after each | `13_evaluate` (**CPU runtime**) | — | `eval/<experiment>/<job>/per_sample.csv, per_image.csv` on Drive | 0 GPU |
 
 Then, on the laptop (or in a Colab CPU runtime), with the `eval/` folder downloaded or Drive-mounted:

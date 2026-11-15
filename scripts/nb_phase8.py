@@ -256,4 +256,74 @@ for exp, mans in EVAL.items():
             code(FREEZE),
         ]
 
-    return nb_sinddm_train, nb_lora_train, nb_evaluate
+    def nb_apps():
+        return [
+            md('''
+# 14 · Qualitative applications on OOD images (Phase 5 R9 / Phase 7 tasks ii–iii)
+
+**T4 GPU runtime, ~20–30 min.** Runs the official application scripts on a few Set A images:
+- **Retargeting** to a 1:2 (wide) and 2:1 (tall) canvas: how does structure survive a change of shape?
+- **Tileable generation** on the patterns: is the periodicity preserved across the wrap-around?
+
+Uses the fused-attention (`exact_flash_attn`) presets, which never build the N×N matrix, so the large targets fit the T4.
+Outputs go to `MyDrive/CS787/outputs/qualitative/` and a contact sheet is shown below (qualitative only, no metrics).
+'''),
+            code(SETTINGS + '''
+NOTEBOOK = "14_applications"
+RETARGET = ["fp_house2", "fp_layout", "pat_p4", "pat_cmm", "ckt_24aa", "dia_life"]
+TILEABLE = ["pat_p4", "pat_cmm", "pat_p2", "pat_demi1"]
+'''),
+            code(GPU_CHECK),
+            code(MOUNT_AND_CODE),
+            code('''
+SID_ROOT = "/content/efficient-SID-code"
+if not os.path.exists(SID_ROOT):
+    subprocess.run(["git", "clone", "-q", "https://github.com/haojunqiu/efficient-SID-code", SID_ROOT], check=True)
+subprocess.run(["git", "-C", SID_ROOT, "checkout", "-q", SID_COMMIT], check=True)
+!pip install -q -r {PROJECT}/env/requirements-colab.txt
+!pip install -q --no-deps -e {SID_ROOT}
+from PIL import Image
+OUT = f"{DRIVE_ROOT}/outputs/qualitative"; os.makedirs(OUT, exist_ok=True)
+IMG = lambda i: f"{PROJECT}/data/ood/setA/{i}.png"
+'''),
+            md("## Retargeting: 1:2 (wide) and 2:1 (tall)"),
+            code('''
+FP32 = "precision.dtype=float32 image_denoiser.patch_denoiser.bottleneck_dtype=float32"
+for i in RETARGET:
+    W, H = Image.open(IMG(i)).size
+    for tag, size in (("wide", f"({H},{2 * W})"), ("tall", f"({2 * H},{W})")):
+        dst = f"{OUT}/retarget_{i}_{tag}.png"
+        if os.path.exists(dst):
+            continue
+        cmd = (f"cd {SID_ROOT} && python scripts/sample_retarget.py --config configs/retarget/pixel_exact_flash_attn.yaml "
+               f"image_path={IMG(i)} output_size='{size}' final_output_path={dst} {FP32} image_denoiser.patch_denoiser.query_chunks=4 "
+               f"2>&1 | tail -1")
+        print(i, tag, size)
+        !{cmd}
+'''),
+            md("## Tileable generation (then tiled 2×2 to show the seams)"),
+            code('''
+for i in TILEABLE:
+    dst = f"{OUT}/tileable_{i}.png"
+    if not os.path.exists(dst):
+        cmd = (f"cd {SID_ROOT} && python scripts/sample_tileable.py --config configs/tileable/pixel_exact_flash_attn.yaml "
+               f"image_path={IMG(i)} final_output_path={dst} {FP32} 2>&1 | tail -1")
+        print(i)
+        !{cmd}
+    im = Image.open(dst).convert("RGB")
+    t = Image.new("RGB", (2 * im.width, 2 * im.height))
+    for a in range(2):
+        for b in range(2):
+            t.paste(im, (a * im.width, b * im.height))
+    t.save(f"{OUT}/tileable_{i}_2x2.png")
+'''),
+            code('''
+import glob
+from IPython.display import display
+for f in sorted(glob.glob(f"{OUT}/retarget_*.png")) + sorted(glob.glob(f"{OUT}/tileable_*_2x2.png")):
+    print(os.path.basename(f)); display(Image.open(f).convert("RGB").copy().resize((min(600, Image.open(f).width), int(Image.open(f).height * min(600, Image.open(f).width) / Image.open(f).width))))
+'''),
+            code(FREEZE),
+        ]
+
+    return nb_sinddm_train, nb_lora_train, nb_evaluate, nb_apps
