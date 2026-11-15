@@ -39,6 +39,8 @@ def main() -> int:
     ap.add_argument("--only", action="append", default=[], help="run only jobs with these names")
     ap.add_argument("--images", action="append", default=[],
                     help="run only these image ids (repeat, or comma-separated); used to split a job across GPUs")
+    ap.add_argument("--max-seeds", type=int, default=None,
+                    help="use only the first N seeds of every job (a smaller run; same outputs/hashes)")
     ap.add_argument("--no-progress", action="store_true", help="one log line per sample instead of progress bars")
     ap.add_argument("--dry-run", action="store_true", help="list jobs, hashes and pending counts; run nothing")
     args = ap.parse_args()
@@ -54,6 +56,9 @@ def main() -> int:
     experiment, jobs = load_jobs(args.job_file, variables)
     if args.only:
         jobs = [j for j in jobs if j.name in set(args.only)]
+    if args.max_seeds:
+        for j in jobs:
+            j.seeds = j.seeds[: args.max_seeds]
     wanted = {i for arg in args.images for i in arg.split(",") if i}
     if wanted:
         for j in jobs:

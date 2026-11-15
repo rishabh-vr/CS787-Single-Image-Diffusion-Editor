@@ -186,9 +186,13 @@ class _Plan:
 
 def job_tasks(job_files: Sequence[str], out_root: str, project_root: str, variables: Dict[str, str],
               n_gpus: int, deadline: Optional[float] = None, chunks_target: Optional[int] = None,
-              python: str = sys.executable) -> Tuple[List[Task], Callable[[], PollResult]]:
+              python: str = sys.executable, limits: Optional[Dict[str, dict]] = None) -> Tuple[List[Task], Callable[[], PollResult]]:
     """Tasks for every pending (job, image chunk) of the job files, in file order, biggest first within a
-    file, plus a ``poll()`` that counts finished samples per experiment on disk."""
+    file, plus a ``poll()`` that counts finished samples per experiment on disk.
+
+    limits: {job_file: {"seeds": N, "images": [ids], "skip": [job names]}} -- a reduced run of that file:
+    only the first N seeds, only these images, without these jobs (same output folders and hashes, so a
+    later full run just adds the missing samples)."""
     from sidx.runner import load_jobs, seed_png
 
     out_root, project_root = Path(out_root), Path(project_root)
@@ -199,6 +203,13 @@ def job_tasks(job_files: Sequence[str], out_root: str, project_root: str, variab
     for jf in job_files:
         with _cwd(project_root):                                  # manifest paths are relative to the repo
             experiment, jobs = load_jobs(project_root / jf, {"PROJECT_ROOT": str(project_root), **variables})
+        lim = (limits or {}).get(jf, {})
+        jobs = [j for j in jobs if j.name not in set(lim.get("skip", []))]
+        for j in jobs:
+            if lim.get("seeds"):
+                j.seeds = j.seeds[: lim["seeds"]]
+            if lim.get("images"):
+                j.images = [im for im in j.images if im.id in set(lim["images"])] or j.images
         file_tasks = []
         per_job = max(1, math.ceil(chunks_target / max(1, len(jobs))))
         for job in jobs:
@@ -220,10 +231,10 @@ def job_tasks(job_files: Sequence[str], out_root: str, project_root: str, variab
                 b[0] += cost
                 b[1].append(iid)
             for i, (cost, ids) in enumerate(bins):
-                def argv(jf=jf, job=job.name, ids=tuple(ids)):
+                def argv(jf=jf, job=job.name, ids=tuple(ids), lim=lim):
                     a = [python, str(project_root / "scripts" / "run_queue.py"), str(project_root / jf),
                          "--out-root", str(out_root), "--only", job, "--images", ",".join(ids), "--no-progress",
-                         *var_args]
+                         *var_args] + (["--max-seeds", str(lim["seeds"])] if lim.get("seeds") else [])
                     if deadline is not None:
                         a += ["--budget-min", f"{max(1.0, (deadline - time.time()) / 60):.1f}"]
                     return a

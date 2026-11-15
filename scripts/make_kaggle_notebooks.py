@@ -41,7 +41,7 @@ HOWTO = '''
 2. Top right **Save Version** → *Save & Run All (Commit)* → Save. It runs in the background (you can close the tab);
    watch it under *View Active Events* / the version's **Logs** (progress lines every 2 min).
 3. When it finishes, the result is the version's **Output**: `cs787___NAME__.zip`.
-4. **Not finished?** (it stops itself before Kaggle's 12-h limit) → *Add Input* → *Your Work* → this notebook's
+4. **Not finished?** (it stops itself before 2 hours) → *Add Input* → *Your Work* → this notebook's
    latest version → then *Save Version* again. It continues where it stopped.
 '''
 
@@ -59,7 +59,7 @@ GITHUB_REPO   = "{REPO}"
 GITHUB_BRANCH = "main"
 SID_COMMIT    = "{SID_COMMIT}"     # official code, audited commit
 SINDDM_COMMIT = "{SINDDM_COMMIT}"  # SinDDM, audited commit
-SESSION_HOURS = 11.0                       # Kaggle stops sessions at 12 h; we stop starting new work at this point
+SESSION_HOURS = 1.9                        # hard stop: everything (incl. zipping) ends before 2 h
 ''' + extra)
 
 
@@ -144,18 +144,26 @@ def k10():
 Runs the job files below with the official code / our core, **both T4s in parallel** (each job is split into
 image chunks; a free GPU takes the next chunk). Same outputs and the same config hashes as the Colab runner.
 
-| Job file | What | Samples | ≈ T4-hours |
-|---|---|---|---|
-| `phase7_ood_gpu.yaml` | Set B (24 synthetic, 128 px) × 20, Set A (24 real OOD, 256 px) × 30 | 1 230 | ≈ 7 |
-| `phase9_ablations.yaml` | AB1–AB4, AB7 on the 6-image subset × 10 | 900 | ≈ 8 |
-| `phase8_ours_on_baseline_images.yaml` | our method on the SinDDM / LoRA images | 240 | ≈ 1.5 |
+**Reduced to finish in < 2 h** (`JOB_LIMITS`; the full plan was ≈ 14 GPU-hours):
 
-≈ 16 T4-hours = **≈ 8 hours on 2 GPUs**: one session. Progress: one bar per job file (samples finished).
+| Job file | Reduced run | Samples | ≈ GPU-h |
+|---|---|---|---|
+| `phase7_ood_gpu.yaml` | Set B (24 synthetic, 128 px) and Set A (24 real OOD, ≤ 256 px), **6 seeds** each | 294 | ≈ 1.0 |
+| `phase9_ablations.yaml` | AB1–AB4, AB7 **without the two T = 40 jobs**, on **4 images** (2 OOD types + circuit + balloons), **4 seeds** | 208 | ≈ 1.3 |
+| `phase8_ours_on_baseline_images.yaml` | our method on the SinDDM / LoRA images, **10 seeds** | 80 | ≈ 0.4 |
+
+≈ 2.7 GPU-hours = **≈ 80 min on 2 GPUs** + ≈ 10 min setup. Rerunning with bigger limits only adds the missing samples.
+Progress: one bar per job file (samples finished).
 '''),
         settings("K10_run_jobs", '''
-JOB_FILES = ["configs/jobs/phase7_ood_gpu.yaml",
-             "configs/jobs/phase9_ablations.yaml",
-             "configs/jobs/phase8_ours_on_baseline_images.yaml"]
+# job file -> limits of this (reduced) run: first N seeds, only these images, without these jobs
+JOB_LIMITS = {
+    "configs/jobs/phase7_ood_gpu.yaml": {"seeds": 6},
+    "configs/jobs/phase9_ablations.yaml": {"seeds": 4, "skip": ["ab3_T40_eta0", "ab3_T40_eta1"],
+                                           "images": ["fp_layout", "pat_p4", "ckt_24aa", "balloons"]},
+    "configs/jobs/phase8_ours_on_baseline_images.yaml": {"seeds": 10},
+}
+JOB_FILES = list(JOB_LIMITS)
 '''),
         CODE, GPU, INSTALL_SID, NATURAL,
         md("## Plan: what is still pending (resumes automatically)"),
@@ -163,8 +171,9 @@ JOB_FILES = ["configs/jobs/phase7_ood_gpu.yaml",
 from sidx.gpupool import job_tasks, run_pool
 unpack_own()
 OUT_ROOT = f"{WORK}/outputs"
-DEADLINE = T_START + SESSION_HOURS * 3600 - 20 * 60        # keep 20 min to zip the results
-tasks, poll = job_tasks(JOB_FILES, OUT_ROOT, PROJECT, {"SID_ROOT": SID_ROOT}, N_GPUS, deadline=DEADLINE)
+DEADLINE = T_START + SESSION_HOURS * 3600 - 8 * 60         # keep 8 min to zip the results
+tasks, poll = job_tasks(JOB_FILES, OUT_ROOT, PROJECT, {"SID_ROOT": SID_ROOT}, N_GPUS, deadline=DEADLINE,
+                        limits=JOB_LIMITS)
 for exp, (d, t) in poll().items():
     print(f"{exp:22s} {d:5d}/{t} samples already done")
 print(len(tasks), "tasks to run:", ", ".join(t.label for t in tasks[:12]), "..." if len(tasks) > 12 else "")
@@ -187,21 +196,24 @@ def k11():
     return [
         header("K11 · SinDDM baseline: training + sampling on 2 GPUs (step 4)", "k11", "GPU T4 x2", '''
 Trains SinDDM on the 3 OOD images (128 px), **all three at the same time** (two on GPU 0, one on GPU 1),
-for `STEPS = 20000` each (the full 120k-step schedule would take ~24 T4-h per image), with the LR milestones
-compressed in proportion. Then samples 30 images from the 5k / 10k / 20k-step checkpoints (a quality-vs-training-time
-curve) and from the 3 **official pretrained** models (converged reference).
+for `STEPS = 3000` each (**reduced to finish in < 2 h**: ≈ 1 T4-hour per image, the same order of compute as our
+method's whole run; the full 120k-step schedule would take ~24 T4-h per image), with the LR milestones compressed in
+proportion. Then samples 20 images from the 1.5k- and 3k-step checkpoints and from the 3 **official pretrained** models
+(fully trained: the converged reference). So the comparison is "SinDDM at a matched, small compute budget" plus
+"SinDDM fully trained" on its own images.
 
 Progress: one bar per image (training steps, with loss and speed), then one bar per sampling job.
 Checkpoints are saved every 10 min, so an interrupted run resumes (attach the output, run again).
 '''),
         settings("K11_sinddm", '''
 IMAGES       = ["sd_b0", "sd_fp_house2", "sd_pat_p4"]   # data/sinddm/*.png, 128 px
-STEPS        = 20000
-SAVE_EVERY   = 5000
-SAMPLE_AFTER = [1, 2, 4]      # checkpoints to sample: 1..4 = 5k..20k steps
-N_SAMPLES    = 30
+STEPS        = 3000
+SAVE_EVERY   = 1500
+SAMPLE_AFTER = [1, 2]         # checkpoints to sample: 1 = 1.5k, 2 = 3k steps
+LR_K_MILESTONES = ["0.45", "1.05", "1.8", "1.95", "2.25", "2.7"]   # official 20/40/70/80/90/110k, scaled to 3k steps
+N_SAMPLES    = 20
 SLOTS        = 3              # trainings at the same time (the model is small; 2 share one T4)
-SAMPLING_RESERVE_MIN = 75     # session minutes kept for sampling + zipping
+SAMPLING_RESERVE_MIN = 22     # session minutes kept for sampling + zipping
 '''),
         CODE, GPU, SINDDM_CLONE,
         md("## Inputs and resume state"),
@@ -235,8 +247,8 @@ def train_argv(i):
         budget = max(1.0, (TRAIN_DEADLINE - time.time()) / 60)
         return [sys.executable, "main.py", "--scope", i, "--mode", "train", "--dataset_folder", f"{DATA}/{i}/",
                 "--image_name", f"{i}.png", "--results_folder", CK, "--train_num_steps", str(STEPS + 1),
-                "--save_and_sample_every", str(SAVE_EVERY), "--sched_k_milestones", "3", "7", "12", "13", "15", "18",
-                "--resume", "--time_budget_min", f"{budget:.1f}", "--checkpoint_every_min", "10", "--seed", "0",
+                "--save_and_sample_every", str(SAVE_EVERY), "--sched_k_milestones", *LR_K_MILESTONES,
+                "--resume", "--time_budget_min", f"{budget:.1f}", "--checkpoint_every_min", "5", "--seed", "0",
                 "--skip_final_sample"]
     return argv
 
@@ -299,7 +311,7 @@ def poll_sample():
 
 try:
     run_pool(tasks, poll_sample, n_gpus=N_GPUS, log_dir=f"{WORK}/logs/{NOTEBOOK}", unit="image",
-             deadline=T_START + SESSION_HOURS * 3600 - 15 * 60)
+             deadline=T_START + SESSION_HOURS * 3600 - 6 * 60)
 finally:
     print(poll_sample())
     pack("k11", kinds=("outputs", "checkpoints"))
@@ -312,16 +324,16 @@ finally:
 def k12():
     return [
         header("K12 · DreamBooth-LoRA baseline on Stable Diffusion 1.5 (step 5)", "k12", "GPU T4 x2", '''
-One LoRA per image (rank 8, lr 1e-4, **600 steps**, batch 1, 512 px, fp16, 8-bit Adam, no prior preservation) for the
-8 images in `data/manifests/lora8.csv` (3 natural + 5 OOD), **two trainings at a time (one per T4)**. Then 30 samples
+One LoRA per image (rank 8, lr 1e-4, **400 steps** (reduced from 600 to finish in < 2 h), batch 1, 512 px, fp16, 8-bit Adam, no prior preservation) for the
+8 images in `data/manifests/lora8.csv` (3 natural + 5 OOD), **two trainings at a time (one per T4)**. Then **15** samples
 per image (30 DDIM steps, CFG 7.5, seeds 10..39), resized back to the input size.
 
 Progress: one bar per image while training (the diffusers step counter), then one bar per image while sampling.
 Limitation (documented): no dev-set tuning of steps / lr on the free tier; the diffusers example's defaults.
 '''),
         settings("K12_lora", '''
-STEPS     = 600
-N_SAMPLES = 30
+STEPS     = 400
+N_SAMPLES = 15
 SEED0     = 10
 DIFFUSERS_VERSION = "0.35.1"
 MODEL = "stable-diffusion-v1-5/stable-diffusion-v1-5"
@@ -374,7 +386,7 @@ def poll_train():
 
 print(len(tasks), "LoRAs to train")
 if tasks:
-    run_pool(tasks, poll_train, n_gpus=N_GPUS, log_dir=LOGS, unit="step", deadline=T_START + SESSION_HOURS * 3600 - 90 * 60)
+    run_pool(tasks, poll_train, n_gpus=N_GPUS, log_dir=LOGS, unit="step", deadline=T_START + SESSION_HOURS * 3600 - 35 * 60)
 for r in rows:                                  # keep the weights in the output
     i = r["id"]
     for f in glob.glob(f"{TMP}/lora_out/{i}/pytorch_lora_weights.*"):
@@ -404,7 +416,7 @@ try:
         have = lambda: sum(os.path.exists(f"{d}/seed_{s:04d}.png") for s in range(SEED0, SEED0 + N_SAMPLES))
         bars.set(i, have(), N_SAMPLES)
         todo = [s for s in range(SEED0, SEED0 + N_SAMPLES) if not os.path.exists(f"{d}/seed_{s:04d}.png")]
-        if not todo or not weights_ready(i) or time.time() > T_START + SESSION_HOURS * 3600 - 15 * 60:
+        if not todo or not weights_ready(i) or time.time() > T_START + SESSION_HOURS * 3600 - 6 * 60:
             continue
         W, H = Image.open(abs_path(r)).size
         pipe.load_lora_weights(f"{LORA}/{i}")
@@ -443,7 +455,7 @@ Already-evaluated jobs are skipped, so you can rerun it after attaching more res
 '''),
         settings("K13_evaluate", '''
 GROUPS      = "paper,patch,copy,structure"   # "patch,copy,structure" = fast pass without pretrained networks
-MAX_SAMPLES = 50
+MAX_SAMPLES = 20                             # per image (keeps the run < 2 h)
 SLOTS       = 2                              # jobs evaluated at the same time (Kaggle CPU sessions have 4 cores)
 # experiment folder -> manifests that contain its input images
 EVAL = {
@@ -498,7 +510,7 @@ def poll():
 
 try:
     run_pool(tasks, poll, slots=SLOTS, n_gpus=0, log_dir=f"{WORK}/logs/{NOTEBOOK}", unit="image",
-             deadline=T_START + SESSION_HOURS * 3600 - 15 * 60)
+             deadline=T_START + SESSION_HOURS * 3600 - 10 * 60)
 finally:
     pack("k13_eval", kinds=("eval",), remove=False)
 '''),

@@ -23,16 +23,21 @@ to 12 h that keep running in the background. Notebooks: `notebooks/kaggle/` (gen
   Kaggle's 12-h limit. **To continue:** *Add Input → Your Work →* the same notebook (latest version) → Save Version
   again. Finished samples are never recomputed.
 
-## The notebooks
-| Notebook | Step | What | GPU time (2 × T4) |
+## The notebooks (each finishes in < 2 h: hard stop at 1 h 54 min)
+| Notebook | Step | Reduced run | Time |
 |---|---|---|---|
-| K10_run_jobs | 3 | Phase 7 OOD, Phase 9 ablations, Phase 8 "ours" (3 job files) | ≈ 8 h, one session |
-| K11_sinddm | 4 | SinDDM: 3 images × 20k steps, all three at once; sampling at 5k/10k/20k + pretrained | ≈ 7–9 h |
-| K12_lora | 5 | DreamBooth-LoRA on 8 images, two at a time; 30 samples each | ≈ 1.5–2 h |
-| K13_evaluate | 6 | metric tables for everything (CPU, no GPU quota) | ≈ 3–5 h CPU |
-| K14_applications | 7 | retargeting / tileable (optional, qualitative) | ≈ 0.5 h |
+| K10_run_jobs | 3 | Phase 7 OOD: Set A + Set B × 6 seeds; Phase 9 ablations without the two T = 40 jobs, 4 images × 4 seeds; Phase 8 "ours" × 10 seeds | ≈ 1.5 h |
+| K11_sinddm | 4 | SinDDM 3 OOD images × **3k steps** (≈ 1 T4-h each, matched to our method's compute), sampled at 1.5k / 3k + the 3 pretrained models, 20 samples each | ≈ 1.6 h |
+| K12_lora | 5 | 8 LoRAs × **400 steps**, two at a time; 15 samples each | ≈ 1.2 h |
+| K13_evaluate | 6 | metrics for everything, ≤ 20 samples per image (CPU, no GPU quota) | ≈ 1–1.5 h |
+| K14_applications | 7 | retargeting / tileable (optional) | ≈ 0.5 h |
 
-K10–K12 together are ≈ 18 GPU-hours, inside one week's quota.
+**Deviation from the plan (2026-11-15):** sample counts and baseline training budgets are cut so that every
+notebook runs in under 2 hours (full plan ≈ 30 GPU-hours, reduced ≈ 6). The cuts only *truncate* seeds / images /
+jobs (`JOB_LIMITS` in K10), so outputs and config hashes are unchanged and a later run with larger limits just adds
+the missing samples. Consequences for the report: wider confidence intervals; SinDDM is compared at a matched
+small compute budget (≈ 1 GPU-hour per image) plus its fully trained pretrained models, not at a reduced 20k-step
+schedule; T = 40 ablations rely on the Phase 4 T = 40 row only.
 
 ## Evaluation inputs (K13)
 Attach: the latest versions of K10, K11, K12 (*Your Work*), and the Colab Phase 4 results: in Google Drive,

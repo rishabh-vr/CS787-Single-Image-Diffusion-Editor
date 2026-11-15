@@ -42,8 +42,8 @@ def main():
     parser.add_argument("--save_and_sample_every", help='n. steps for checkpointing model.', default=10000, type=int)
     parser.add_argument("--avg_window", help='window size for averaging loss (visualization only).', default=100, type=int)
     parser.add_argument("--train_lr", help='starting lr.', default=1e-3, type=float)
-    parser.add_argument("--sched_k_milestones", nargs="+", help='lr scheduler steps x 1000.',
-                        default=[20, 40, 70, 80, 90, 110], type=int)
+    parser.add_argument("--sched_k_milestones", nargs="+", help='lr scheduler steps x 1000 ([port] fractions allowed, e.g. 0.6).',
+                        default=[20, 40, 70, 80, 90, 110], type=float)
     parser.add_argument("--load_milestone", help='load specific milestone (an integer, or [port] "last" = model-last.pt).', default='0')
     # sampling params
     parser.add_argument("--sample_batch_size", help='batch size during sampling.', default=16, type=int)
@@ -100,7 +100,7 @@ def main():
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
     scale_mul = (args.scale_mul[0], args.scale_mul[1])
-    sched_milestones = [val * 1000 for val in args.sched_k_milestones]
+    sched_milestones = [int(round(val * 1000)) for val in args.sched_k_milestones]
     results_folder = args.results_folder + '/' + args.scope
 
     # set to true to save all intermediate diffusion timestep results
