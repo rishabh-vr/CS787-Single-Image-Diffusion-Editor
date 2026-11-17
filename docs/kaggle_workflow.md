@@ -33,7 +33,7 @@ to 12 h that keep running in the background. Notebooks: `notebooks/kaggle/` (gen
 | K14_applications | 7 | retargeting / tileable (optional) | ≈ 0.5 h |
 
 **Deviation from the plan (2026-11-15):** sample counts and baseline training budgets are cut so that every
-notebook runs in under 2 hours (full plan ≈ 30 GPU-hours, reduced ≈ 6). The cuts only *truncate* seeds / images /
+notebook runs in under 2 hours (full plan ≈ 30 GPU-hours; the reduced runs used ≈ 9 including the Colab reproduction). The cuts only *truncate* seeds / images /
 jobs (`JOB_LIMITS` in K10), so outputs and config hashes are unchanged and a later run with larger limits just adds
 the missing samples. Consequences for the report: wider confidence intervals; SinDDM is compared at a matched
 small compute budget (≈ 1 GPU-hour per image) plus its fully trained pretrained models, not at a reduced 20k-step

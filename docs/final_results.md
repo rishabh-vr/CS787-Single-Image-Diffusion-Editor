@@ -19,7 +19,7 @@ its samples; the n per row is given.
 | Evaluation | 26 job folders, ≤ 20 samples per image, CPU | — | K13 |
 
 **Deviations from the plan, which must be stated in the report:**
-- Everything ran on free GPUs. To fit, each notebook was capped at under 2 hours, so seeds and images were truncated (the full plan was ≈ 30 GPU-h; the reduced run used ≈ 6).
+- Everything ran on free GPUs. To fit, each notebook was capped at under 2 hours, so seeds and images were truncated (the full plan was ≈ 30 GPU-h; the reduced runs used ≈ 9 GPU-h of computation: Colab 1.7, K10 3.1, K11 1.8, K12 0.7, K14 ≈ 1.7).
 - Phase 4 reached 7 of the 15 natural images. The T = 40 / η = 1 and ANN reproduction jobs did not run.
 - SinDDM was trained for 3k steps instead of the official 120k. This gives a *matched-compute* comparison, not a converged one. The pretrained models serve as the converged reference, but only on SinDDM's own images.
 - The LoRA settings are the diffusers defaults. There was no tuning set.
