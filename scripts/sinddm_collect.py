@@ -52,13 +52,7 @@ def main() -> None:
     job_dir = Path(args.out_root) / "phase8_sinddm" / f"{args.job}__sinddm"
     img_dir = job_dir / args.image_id
     img_dir.mkdir(parents=True, exist_ok=True)
-    jj = job_dir / "job.json"           # one job folder holds several images: add this one to the list
-    meta = json.loads(jj.read_text()) if jj.exists() else {
-        "experiment": "phase8_sinddm", "job": args.job, "method": "sinddm",
-        "params": {"milestone": args.milestone, "results_folder": args.results_folder}, "images": []}
-    if not any(im["id"] == args.image_id for im in meta["images"]):
-        meta["images"].append({"id": args.image_id, "path": args.image_path})
-        jj.write_text(json.dumps(meta, indent=2))
+    _register_image(job_dir, args)
 
     milestone_arg = {"last": "last", "pretrained": "12"}.get(args.milestone, args.milestone)
     todo = [k for k in range(args.n) if not (img_dir / f"seed_{args.seed0 + k:04d}.png").exists()]
@@ -86,6 +80,37 @@ def main() -> None:
         print(f"[collect] {args.job}/{args.image_id}: {len(ks)} samples from seed {seed} "
               f"({time.time() - t0:.0f}s so far)", flush=True)
     print(f"[collect] {args.job}/{args.image_id}: {len(list(img_dir.glob('seed_*.png')))} samples in {img_dir}")
+
+
+def read_json_lenient(path: Path) -> dict:
+    """First JSON object in the file. Runs before 2026-11-17 could leave trailing garbage after it
+    (parallel tasks wrote job.json at once); the first object is complete."""
+    return json.JSONDecoder().raw_decode(path.read_text().lstrip())[0]
+
+
+def _register_image(job_dir: Path, args) -> None:
+    """Add this image to job.json. Parallel tasks (one per image) share the job folder: lock + atomic write."""
+    jj = job_dir / "job.json"
+    lock = open(job_dir / ".job.json.lock", "w")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except ImportError:                       # Windows: no parallel sampling there
+            pass
+        try:
+            meta = read_json_lenient(jj)
+        except Exception:
+            meta = {"experiment": "phase8_sinddm", "job": args.job, "method": "sinddm",
+                    "params": {"milestone": args.milestone, "results_folder": args.results_folder}, "images": []}
+        meta.setdefault("images", [])
+        if not any(im["id"] == args.image_id for im in meta["images"]):
+            meta["images"].append({"id": args.image_id, "path": args.image_path})
+        tmp = jj.with_name(f"job.json.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(meta, indent=2))
+        os.replace(tmp, jj)
+    finally:
+        lock.close()
 
 
 if __name__ == "__main__":

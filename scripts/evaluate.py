@@ -131,7 +131,8 @@ def main() -> None:
     for job_dir in sorted(p.parent for p in exp_dir.glob("*/job.json")):
         if args.only_job and args.only_job not in job_dir.name:
             continue
-        job = json.loads((job_dir / "job.json").read_text())
+        # first JSON object only: early K11 runs left trailing garbage in phase8_sinddm job.json (parallel writes)
+        job = json.JSONDecoder().raw_decode((job_dir / "job.json").read_text().lstrip())[0]
         job_images = {i["id"]: i["path"] for i in job.get("images", [])}
         out_dir = eval_root / exp_dir.name / job_dir.name
         image_dirs = sorted(d for d in job_dir.iterdir() if d.is_dir() and list(d.glob("seed_*.png")))
