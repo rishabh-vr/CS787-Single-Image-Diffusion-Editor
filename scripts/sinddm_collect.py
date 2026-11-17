@@ -52,11 +52,13 @@ def main() -> None:
     job_dir = Path(args.out_root) / "phase8_sinddm" / f"{args.job}__sinddm"
     img_dir = job_dir / args.image_id
     img_dir.mkdir(parents=True, exist_ok=True)
-    if not (job_dir / "job.json").exists():
-        (job_dir / "job.json").write_text(json.dumps({
-            "experiment": "phase8_sinddm", "job": args.job, "method": "sinddm",
-            "params": {"milestone": args.milestone, "results_folder": args.results_folder},
-            "images": [{"id": args.image_id, "path": args.image_path}]}, indent=2))
+    jj = job_dir / "job.json"           # one job folder holds several images: add this one to the list
+    meta = json.loads(jj.read_text()) if jj.exists() else {
+        "experiment": "phase8_sinddm", "job": args.job, "method": "sinddm",
+        "params": {"milestone": args.milestone, "results_folder": args.results_folder}, "images": []}
+    if not any(im["id"] == args.image_id for im in meta["images"]):
+        meta["images"].append({"id": args.image_id, "path": args.image_path})
+        jj.write_text(json.dumps(meta, indent=2))
 
     milestone_arg = {"last": "last", "pretrained": "12"}.get(args.milestone, args.milestone)
     todo = [k for k in range(args.n) if not (img_dir / f"seed_{args.seed0 + k:04d}.png").exists()]

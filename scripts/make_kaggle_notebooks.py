@@ -229,7 +229,7 @@ CK = f"{WORK}/checkpoints/sinddm"
 OUT_ROOT = f"{WORK}/outputs"
 
 def trained_steps(i):
-    p = f"{CK}/{i}/{i}/model-last.pt"
+    p = f"{CK}/{i}/model-last.pt"            # main.py writes to <results_folder>/<scope>/
     if not os.path.exists(p):
         return 0
     with torch.serialization.safe_globals([collections.Counter]):
@@ -254,7 +254,7 @@ def train_argv(i):
 
 def read_progress(i):
     try:
-        return json.load(open(f"{CK}/{i}/{i}/progress.json"))
+        return json.load(open(f"{CK}/{i}/progress.json"))
     except Exception:
         return {}
 
@@ -288,7 +288,7 @@ expected, tasks = [], []
 for i in IMAGES:                     # one task per image (its checkpoints one after another: same scratch folder)
     cmds = []
     for k in SAMPLE_AFTER:
-        if os.path.exists(f"{CK}/{i}/{i}/model-{k}.pt"):
+        if os.path.exists(f"{CK}/{i}/model-{k}.pt"):
             job = f"sinddm_steps{k * SAVE_EVERY}"
             cmds.append(collect_cmd(job, i, f"{DATA}/{i}/", f"{i}.png", CK, k, i, f"{PROJECT}/data/sinddm/{i}.png"))
             expected.append((job, i))
