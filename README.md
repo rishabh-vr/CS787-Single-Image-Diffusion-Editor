@@ -17,6 +17,7 @@ All GPU work runs on **free Google Colab**.
 | [docs/technical_notes.md](docs/technical_notes.md) | Phase 1: paper analysis, code audit, paper-vs-code differences, metric definitions |
 | [docs/colab_workflow.md](docs/colab_workflow.md) | How to run everything on free Colab |
 | [docs/kaggle_workflow.md](docs/kaggle_workflow.md) | Steps 3–7 on free Kaggle (2 × T4, background runs, progress bars) |
+| [docs/final_results.md](docs/final_results.md) | **Final results**: reproduction, OOD, baselines, ablations, applications (figures in `reports/figures/final/`) |
 
 ## Layout
 
