@@ -110,6 +110,14 @@ import efficient_sid, sidx
 print("efficient_sid OK | sidx", sidx.__version__)
 ''')
 
+SID_CLONE = code('''
+# only the official repo's data downloader is needed here (no install: keeps K12's diffusers stack untouched)
+SID_ROOT = f"{TMP}/efficient-SID-code"
+if not os.path.exists(SID_ROOT):
+    subprocess.run(["git", "clone", "-q", "https://github.com/haojunqiu/efficient-SID-code", SID_ROOT], check=True)
+subprocess.run(["git", "-C", SID_ROOT, "checkout", "-q", SID_COMMIT], check=True)
+''')
+
 NATURAL = code('''
 # natural images (balloons, forest, ...) are third-party and not in the repo: fetch + check sha256 against the manifests
 r = subprocess.run([sys.executable, "scripts/prepare_natural.py", "--verify", "--sets", "uncond/sinddm15", "--sid-root", SID_ROOT],
@@ -338,7 +346,7 @@ SEED0     = 10
 DIFFUSERS_VERSION = "0.35.1"
 MODEL = "stable-diffusion-v1-5/stable-diffusion-v1-5"
 '''),
-        CODE, GPU,
+        CODE, GPU, SID_CLONE, NATURAL,
         code('''
 !pip uninstall -q -y torchao
 !pip install -q diffusers=={DIFFUSERS_VERSION} transformers==4.53.2 accelerate==1.9.0 peft==0.17.1 bitsandbytes pandas
