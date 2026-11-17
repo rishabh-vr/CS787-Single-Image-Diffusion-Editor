@@ -9,7 +9,7 @@ What we do:
 2. **Test it out of distribution:** floor plans, geometric patterns, circuit schematics, plus a controlled synthetic set.
 3. **Compare** it against training-based baselines: SinDDM and DreamBooth-LoRA.
 
-All GPU work runs on **free Google Colab**.
+All GPU work ran on **free Google Colab and Kaggle** GPUs.
 
 | Start here | |
 |---|---|
@@ -42,22 +42,5 @@ docs/                technical notes and workflow
 ```
 
 Third-party code (`efficient-SID-code`, `SinDDM`) is **not vendored**. The notebooks clone it at the audited commits recorded in `docs/technical_notes.md`.
-
-## Status
-
-- Phase 1 (paper and code analysis): done.
-- Phase 2 (infrastructure): done on Colab for SinDDM and LoRA; official-code timings (notebook 00) and
-  the TPU test (notebook 07) pending.
-- Phase 3 (natural data): done — 59 images in 6 sets, manifests with sha256 and descriptors.
-- Phase 4 (reproduction): our core is implemented and matches the official code on CPU (fp32, same seed;
-  full-size check at the paper preset: mean difference 0.002–0.004 grey levels); the Colab reproduction runs
-  are queued in `configs/jobs/phase4_reproduction.yaml` (notebook 10).
-- Phases 5–6 (metrics, OOD data): done. Metric suite + evaluator + analysis tooling; Set A (24 licensed Wikimedia
-  Commons images: floor plans, patterns, circuits, diagrams) and Set B (24 synthetic line drawings, one factor at a time).
-- Phases 7–9 (OOD runs, baselines, ablations): jobs and notebooks are ready (`configs/jobs/phase7_*, phase8_*, phase9_*`,
-  notebooks 10–13); the GPU runs are pending on Colab. A small laptop pilot of the OOD sweep and the failure-isolation
-  experiments (`scripts/failure_isolation.py`) run on the CPU.
-- Phases 10–12 (analysis, report): tooling is ready (`scripts/analyze.py`, `make_figures.py`, `build_results_md.py` → `docs/results.md`).
-  The final numbers need the GPU runs. Session-by-session plan: `docs/colab_workflow.md` §2b.
 
 Run the tests (CPU, ~2 min): `python -m pytest -q`
