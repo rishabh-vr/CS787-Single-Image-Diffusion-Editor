@@ -54,6 +54,10 @@ def with_meta(df, names):
 
 def cmd_table1(a):
     df = A.load_eval(a.eval_root, "phase4_reproduction")
+    # the paper's pixel diversity (0.10-0.15) is on the scale of our un-normalised variant (values in [0, 1]);
+    # the SinGAN-style one divided by the input's std is ~4x larger, so Table 1 uses the raw one
+    if "pixel_div_raw" in df:
+        df["pixel_div"] = df["pixel_div_raw"]
     cols = ["sifid", "niqe", "nima", "musiq", "pixel_div", "lpips_div"]
     rows = []
     for job, g in df.groupby("job"):
@@ -73,6 +77,13 @@ def cmd_table1(a):
 def cmd_ood(a):
     df = A.load_eval(a.eval_root, "phase7_ood")
     df = with_meta(df, ["ood_setA", "synthetic_setB"])
+    # Set B: deterministic generators (b0, thickness, density, junctions) give the same image for seeds s0/s1:
+    # count each distinct input once (16 unique of 24 ids), otherwise those factors are double-weighted
+    if "sha256" in df:
+        n0 = len(df)
+        df = df[df["sha256"].isna() | ~df.duplicated(["job", "sha256"])]
+        if len(df) < n0:
+            print(f"[ood] dropped {n0 - len(df)} duplicate inputs (identical sha256 within a job)")
     df["category"] = df["category"].fillna("unknown")
     mets = ["patch_swd", "patch_precision", "patch_recall", "block_copy_ratio", "struct_dev", "endpoint_excess",
             "mean_seg_len_ratio", "grey_ratio", "edge_density_ratio", "junction_hist_l1", "spectral_peak_recall",
