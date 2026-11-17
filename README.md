@@ -5,6 +5,7 @@
 Course project (CS787) built on **Qiu, Kutulakos & Lindell, *Efficient and Training-Free Single-Image Diffusion Models*** (arXiv:2606.04299; official code: [haojunqiu/efficient-SID-code](https://github.com/haojunqiu/efficient-SID-code), MIT).
 
 What we do:
+
 1. **Reproduce** the paper's closed-form, training-free single-image diffusion.
 2. **Test it out of distribution:** floor plans, geometric patterns, circuit schematics, plus a controlled synthetic set.
 3. **Compare** it against training-based baselines: SinDDM and DreamBooth-LoRA.
