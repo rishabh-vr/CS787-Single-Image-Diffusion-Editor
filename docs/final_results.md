@@ -80,14 +80,14 @@ Figures: `fig_ood_gallery.png`, `fig_ood_metrics.png`, `fig_failures.png`.
 | **ours** | 3 OOD images, 128 px | **0.39** | 0.34 | 0.97 | 0.13 | **36 s** (1.8 s/sample, no training) |
 | SinDDM, 3k steps | same 3 | 18.9 | 0.02 | 0.38 | 0.40 | ≈ 32 min training + 46 s |
 | **ours** | 5 OOD images, ≤ 256 px | **2.48** | 0.34 | 0.97 | 0.53 | 11.4 min (34 s/sample) |
-| DreamBooth-LoRA | same 5 (+ 3 natural) | 13.0 | 0.04 | 0.53 | 0.43 | 3.8 min training + 107 s |
+| DreamBooth-LoRA | same 5 | 15.6 | 0.03 | 0.39 | 0.40 | 3.8 min training + 107 s |
 | SinDDM pretrained (≈ 120k steps) | its 3 natural images | 1.75 | 0.30 | 1.00 | 0.38 | (≈ 1 day of training, from the SinDDM paper) |
 
 - **SinDDM at a matched budget of ≈ 1 GPU-hour is not usable on drawings.** It produces blurred grids, broken p4 tiles and an almost blank floor plan, which got *worse* from 1.5k to 3k steps. Our method needs no training.
 - **However, our low SIFID at 128 px is partly memorisation.** On the floor plan and the grid, our samples are near-copies of the input (copied-block ratio 0.52, LPIPS div. 0.08–0.19). Small, simple drawings leave the patch denoiser little to recombine.
 - **LoRA is the opposite of ours.**
   - It makes *globally* coherent drawings: whole houses with connected rooms, and a tidy chip schematic.
-  - It copies almost nothing (copied-block ratio 0.04).
+  - It copies almost nothing (copied-block ratio 0.03).
   - But it drifts from the input: palette and symmetry change on patterns (patch precision 0.001–0.003 on p4 / cmm), and text becomes pseudo-letters. SIFID is 5–10× worse.
   - It is faster than ours at 256 px (5.4 s against 34 s per sample, after a 4-minute training run). Ours is exact attention over all patches, which costs O(N²).
 - **Overall:** the training-free method is the most faithful to the input's local statistics, and the cheapest when only a few samples are needed. Its weakness is global structure, which is exactly what drawings need.

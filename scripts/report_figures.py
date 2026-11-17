@@ -126,7 +126,7 @@ def fig_ood_gallery(res, out):
     pick = [("fp_layout", "floor plan"), ("fp_apartment", "floor plan"), ("pat_p4", "pattern p4"),
             ("pat_circlepack", "pattern"), ("ckt_555", "circuit"), ("dia_life", "diagram")]
     rows = [(lab, [ROOT / f"data/ood/setA/{i}.png"] + seeds(a, i, 4)) for i, lab in pick]
-    image_grid(rows, ["input", "samples (6 seeds run, 4 shown)", "", "", ""], out, "fig_ood_gallery", cell=1.4)
+    image_grid(rows, ["input", "samples", "", "", ""], out, "fig_ood_gallery", cell=1.4)
 
 
 def fig_applications(res, out):
