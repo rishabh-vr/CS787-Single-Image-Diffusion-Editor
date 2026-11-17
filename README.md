@@ -22,9 +22,25 @@ All GPU work ran on **free Google Colab and Kaggle** GPUs.
 | [report/CS787_Project_Report.pdf](report/CS787_Project_Report.pdf) | **Final report** (PDF; editable .docx alongside) |
 | [report/CS787_Project_Slides.pdf](report/CS787_Project_Slides.pdf) | **Presentation** (15 slides; PowerPoint version alongside) |
 
+## Try it: interactive prototype
+
+A local web app that runs the method on any image, using our own implementation (`src/sidx/core`). It works on a CPU; no GPU, training or downloads needed.
+
+```
+pip install streamlit torch numpy pillow scipy
+streamlit run app/demo.py          # or double-click app/run_demo.bat on Windows
+```
+
+- **Input:** pick a bundled example (floor plans, circuits, diagrams, patterns, synthetic drawings) or upload your own image.
+- **Output:** several samples, retargeted to another width or height if you want.
+- **Inside a sample:** the coarse-to-fine trace and a *provenance map* showing which input patch every output patch came from.
+- **Metrics:** the project's copying metrics (patch recall, patch precision, copied-block ratio).
+- **Speed:** a *patch stride* setting evaluates the closed-form denoiser on every s-th patch, about s⁴ less work. On a laptop CPU a 160 px sample takes about 5 s at stride 3 and 15 s at stride 2. Stride 1 gives exactly the same output as `CoreSampler`, the paper's setting.
+
 ## Layout
 
 ```
+app/                 interactive prototype (Streamlit): demo.py UI, engine.py sampler additions
 src/sidx/core/       our re-implementation of the method (CPU or CUDA), checked against the official code
 src/sidx/methods/    one interface for every generator: sid_core (ours), sid_official, dummy
 src/sidx/data/       image descriptors (edge density, periodicity, patch rarity, ...)
